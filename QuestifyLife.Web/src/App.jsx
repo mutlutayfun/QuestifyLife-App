@@ -6,7 +6,9 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Friends from "./pages/Friends";
-import History from "./pages/History"; // YENİ IMPORT
+import History from "./pages/History";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -19,6 +21,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        {/* Bildirim Kutusu (Her sayfanın üstünde görünür) */}
+        <ToastContainer position="top-right" autoClose={3000} />
+        
         <Routes>
           {/* Giriş ve Kayıt Sayfaları (Eğer bunları silerseniz login ekranı gelmez!) */}
           <Route path="/login" element={<Login />} />

@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import api from '../api/axiosConfig';
 import { AuthContext } from '../context/AuthContext';
 import Layout from '../components/Layout';
+import { toast } from 'react-toastify';
 
 // Hazır Avatar Listesi (Dosya isimleri backend ile uyumlu olmalı)
 // Bu resimleri public/avatars klasörüne koyman gerekecek, yoksa kırık görünür.
@@ -48,10 +49,10 @@ export default function Profile() {
             await api.put('/User/profile', formData);
             setIsEditing(false);
             fetchProfile(); // Güncel veriyi çek
-            alert("Profil güncellendi!");
+            toast.success("Profil güncellendi! ✅");
         } catch (error) {
             console.error("Tamamlama hatası:", error);
-            alert("Profil güncellenirken hata oluştu!");
+            toast.error("Profil güncellenirken hata oluştu!");
         }
     };
 

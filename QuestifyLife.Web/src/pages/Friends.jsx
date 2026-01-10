@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../api/axiosConfig';
 import Layout from '../components/Layout';
 import LeaderboardItem from '../components/LeaderboardItem';
+import { toast } from 'react-toastify';
 
 export default function Friends() {
     const [activeTab, setActiveTab] = useState('leaderboard'); // leaderboard, add, requests
@@ -47,10 +48,10 @@ export default function Friends() {
         e.preventDefault();
         try {
             await api.post('/Friends/send-request', { targetEmail: emailToAdd });
-            alert("İstek gönderildi!");
+            toast.success("İstek gönderildi!");
             setEmailToAdd("");
         } catch (err) {
-            alert(err.response?.data?.message || "İstek gönderilemedi.");
+            toast.error(err.response?.data?.message || "İstek gönderilemedi.");
         }
     };
 
@@ -58,10 +59,10 @@ export default function Friends() {
         try {
             await api.post(`/Friends/respond/${requestId}?accept=${accept}`);
             fetchRequests(); // Listeyi yenile
-            alert(accept ? "Arkadaş eklendi!" : "İstek reddedildi.");
+            toast.success(accept ? "Arkadaş eklendi!" : "İstek reddedildi.");
         } catch (err) {
             console.error(err); // Hata değişkenini kullandık
-            alert("İşlem başarısız.");
+            toast.error("İşlem başarısız.");
         }
     };
 
@@ -72,7 +73,7 @@ export default function Friends() {
             fetchLeaderboard();
         } catch (err) {
             console.error(err); // Hata değişkenini kullandık
-            alert("Silinemedi.");
+            toast.error("Silinemedi.");
         }
     }
 
