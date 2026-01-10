@@ -145,8 +145,16 @@ namespace QuestifyLife.Infrastructure.Services
                 .GetWhere(d => d.UserId == userId && d.Date.Year == year && d.Date.Month == month)
                 .ToListAsync();
 
-            // O aya ait tamamlanan görev sayılarını bulmak için biraz karmaşık sorgu gerekir.
-            // Şimdilik sadece performans tablosundan gidelim, basit olsun.
+            var startDate = new DateTime(year, month, 1);
+            var endDate = startDate.AddMonths(1).AddDays(-1).AddHours(23).AddMinutes(59);
+
+            var completedQuestsInMonth = await _questRepository
+                .GetWhere(q => q.UserId == userId &&
+                      q.IsCompleted &&
+                      q.ScheduledDate >= startDate &&
+                      q.ScheduledDate <= endDate)
+                .Select(q => new { q.ScheduledDate, q.Title }) // Bize sadece tarih ve başlık lazım
+                .ToListAsync();
 
             var calendarData = performances.Select(p => new CalendarDayDto
             {
@@ -154,7 +162,12 @@ namespace QuestifyLife.Infrastructure.Services
                 Points = p.TotalPointsEarned,
                 TargetReached = p.IsTargetReached,
                 Note = p.DayNote,
-                CompletedQuestCount = 0 // Bunu doldurmak için Join gerekir, şimdilik 0 kalsın veya ayrı sorgu atılabilir.
+                CompletedQuests = completedQuestsInMonth
+                    .Where(q => q.ScheduledDate.Date == p.Date.Date) // Tarih eşleşmesi
+                    .Select(q => q.Title)
+                    .ToList(),
+
+                CompletedQuestCount = completedQuestsInMonth.Count(q => q.ScheduledDate.Date == p.Date.Date)
             }).ToList();
 
             return calendarData;

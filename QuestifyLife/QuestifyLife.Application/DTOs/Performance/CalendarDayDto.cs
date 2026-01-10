@@ -13,5 +13,6 @@ namespace QuestifyLife.Application.DTOs.Performance
         public bool TargetReached { get; set; }
         public string? Note { get; set; } // O gün aldığı notu takvimde görsün
         public int CompletedQuestCount { get; set; }
+        public List<string> CompletedQuests { get; set; } = new List<string>();
     }
 }

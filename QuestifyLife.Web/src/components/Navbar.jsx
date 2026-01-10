@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 const Navbar = () => {
     const location = useLocation();
 
-    // Hangi sayfadaysak o butonu aktif (renkli) göster
     const isActive = (path) => location.pathname === path 
         ? "text-primary border-t-2 border-primary" 
         : "text-gray-400 hover:text-gray-600";
@@ -17,7 +16,12 @@ const Navbar = () => {
                     <span className="text-xs font-medium">Ana Sayfa</span>
                 </Link>
 
-                {/* YENİ AÇILAN KISIM */}
+                {/* YENİ LINK */}
+                <Link to="/history" className={`flex flex-col items-center justify-center w-full h-full ${isActive('/history')}`}>
+                    <span className="text-2xl">📅</span>
+                    <span className="text-xs font-medium">Geçmiş</span>
+                </Link>
+
                 <Link to="/friends" className={`flex flex-col items-center justify-center w-full h-full ${isActive('/friends')}`}>
                     <span className="text-2xl">👥</span>
                     <span className="text-xs font-medium">Sosyal</span>
