@@ -10,6 +10,7 @@ function App() {
         </p>
         <div className="mt-6 p-4 bg-white rounded-lg shadow-md">
           <p className="text-secondary font-semibold">Sistem Ayakta!</p>
+
         </div>
       </div>
     </div>
