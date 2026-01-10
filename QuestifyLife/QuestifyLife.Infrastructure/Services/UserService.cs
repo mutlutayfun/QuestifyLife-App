@@ -47,7 +47,7 @@ namespace QuestifyLife.Infrastructure.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return false;
 
-            // Sadece değişen alanları güncelle
+            
             if (request.DailyTargetPoints > 0)
                 user.DailyTargetPoints = request.DailyTargetPoints;
 
