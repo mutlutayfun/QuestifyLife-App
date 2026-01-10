@@ -4,9 +4,9 @@ import { AuthProvider, AuthContext } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-import Profile from "./pages/Profile"; // Yeni sayfa
+import Profile from "./pages/Profile";
+import Friends from "./pages/Friends"; // YENİ IMPORT
 
-// GÜVENLİK GÖREVLİSİ
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
   if (loading) return <div className="p-4">Yükleniyor...</div>;
@@ -22,9 +22,11 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           
-          {/* Korumalı Sayfalar */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          
+          {/* YENİ ROTA */}
+          <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
           
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>

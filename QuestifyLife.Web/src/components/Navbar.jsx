@@ -17,17 +17,16 @@ const Navbar = () => {
                     <span className="text-xs font-medium">Ana Sayfa</span>
                 </Link>
 
+                {/* YENİ AÇILAN KISIM */}
+                <Link to="/friends" className={`flex flex-col items-center justify-center w-full h-full ${isActive('/friends')}`}>
+                    <span className="text-2xl">👥</span>
+                    <span className="text-xs font-medium">Sosyal</span>
+                </Link>
+
                 <Link to="/profile" className={`flex flex-col items-center justify-center w-full h-full ${isActive('/profile')}`}>
                     <span className="text-2xl">👤</span>
                     <span className="text-xs font-medium">Profil</span>
                 </Link>
-
-                {/* İleride Arkadaş sayfası gelince burayı açacağız */}
-                {/* <Link to="/friends" className={`flex flex-col items-center justify-center w-full h-full ${isActive('/friends')}`}>
-                    <span className="text-2xl">👥</span>
-                    <span className="text-xs font-medium">Sosyal</span>
-                </Link> 
-                */}
 
             </div>
         </nav>
