@@ -1,0 +1,21 @@
+﻿using QuestifyLife.Application.DTOs.Badges;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace QuestifyLife.Application.DTOs.Auth
+{
+    public class UserProfileDto
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public int TotalXp { get; set; }
+        public int CurrentStreak { get; set; }
+        public int DailyTargetPoints { get; set; }
+        public string? PersonalManifesto { get; set; }
+        public string AvatarId { get; set; } // Profilde görünsün
+        public List<BadgeDto> Badges { get; set; } = new List<BadgeDto>();
+    }
+}

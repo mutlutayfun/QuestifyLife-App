@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="QuestifyLife.API/QuestifyLife.API.csproj" />
+  <Project Path="QuestifyLife.Application/QuestifyLife.Application.csproj" />
+  <Project Path="QuestifyLife.Domain/QuestifyLife.Domain.csproj" />
+  <Project Path="QuestifyLife.Infrastructure/QuestifyLife.Infrastructure.csproj" />
+</Solution>
