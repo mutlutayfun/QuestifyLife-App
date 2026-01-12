@@ -13,6 +13,7 @@ public interface IQuestService
 {
     Task<Quest> CreateQuestAsync(CreateQuestRequest request);
     Task<List<QuestDto>> GetPendingQuestsAsync(Guid userId); // Yapılacaklar
-    Task<OperationResultDto> CompleteQuestAsync(Guid questId); // Görevi tamamla
+    Task<OperationResultDto> ToggleQuestStatusAsync(Guid questId, Guid userId);// Görevi tamamla
     Task<bool> DeleteQuestAsync(Guid questId, Guid userId);
+    Task<bool> UpdateQuestAsync(UpdateQuestRequest request);
 }

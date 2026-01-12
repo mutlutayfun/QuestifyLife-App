@@ -16,5 +16,6 @@ namespace QuestifyLife.Application.DTOs.Common
 
         // İstersen kazanılan puanı da dönebilirsin
         public int? EarnedPoints { get; set; }
+        public bool IsCompleted { get; set; }
     }
 }

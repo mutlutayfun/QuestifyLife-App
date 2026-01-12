@@ -40,12 +40,26 @@ namespace QuestifyLife.API.Controllers
             return Ok(quests);
         }
 
-        [HttpPost("complete/{questId}")]
-        public async Task<IActionResult> Complete(Guid questId)
+        [HttpPost("toggle/{id}")]
+        public async Task<IActionResult> ToggleQuest(Guid id)
         {
-           
-            var result = await _questService.CompleteQuestAsync(questId);
-            if (!result.IsSuccess) return BadRequest(new { message = result.Message });
+            var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+            var result = await _questService.ToggleQuestStatusAsync(id, userId);
+
+            if (!result.IsSuccess && result.Message != "Görev geri alındı.") // Hata durumları için
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> UpdateQuest([FromBody] UpdateQuestRequest request)
+        {
+            var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+            request.UserId = userId; // Güvenlik için User ID'yi token'dan alıp request'e gömüyoruz
+
+            var result = await _questService.UpdateQuestAsync(request);
+            if (!result) return BadRequest("Güncelleme başarısız.");
 
             return Ok(result);
         }
