@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using QuestifyLife.Application.DTOs.Auth;
 using QuestifyLife.Application.Interfaces;
+using QuestifyLife.Application.Wrappers;
 using System;
 using System.Threading.Tasks;
 
@@ -74,6 +75,21 @@ namespace QuestifyLife.API.Controllers
 
             // Cevap olarak Token'ı da dönüyoruz
             return Ok(new { message = "Giriş başarılı!", token = token, user = userDto });
+        }
+
+        [HttpPost("change-password")]
+        public async Task<ActionResult<ServiceResponse<bool>>> ChangePassword(ChangePasswordDto request)
+        {
+            // Giriş yapmış kullanıcının ID'sini al (Claim'lerden)
+            var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+
+            var response = await _authService.ChangePasswordAsync(userId, request.OldPassword, request.NewPassword);
+
+            if (!response.Success)
+            {
+                return BadRequest(response);
+            }
+            return Ok(response);
         }
     }
 }

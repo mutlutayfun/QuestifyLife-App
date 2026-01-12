@@ -1,5 +1,6 @@
 ﻿using QuestifyLife.Application.DTOs.Auth;
 using QuestifyLife.Domain.Entities;
+using QuestifyLife.Application.Wrappers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,4 +13,5 @@ public interface IAuthService
 {
     Task<User> RegisterAsync(RegisterRequest request);
     Task<User?> LoginAsync(LoginRequest request);
+    Task<ServiceResponse<bool>> ChangePasswordAsync(Guid userId, string oldPassword, string newPassword);
 }
