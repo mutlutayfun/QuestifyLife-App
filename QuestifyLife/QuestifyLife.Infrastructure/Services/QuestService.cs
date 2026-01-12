@@ -90,23 +90,20 @@ namespace QuestifyLife.Infrastructure.Services
             var quest = await _questRepository.GetByIdAsync(questId);
             if (quest == null) return new OperationResultDto { IsSuccess = false, Message = "Görev bulunamadı." };
 
-            // Güvenlik: Başkasının görevini değiştiremesin
             if (quest.UserId != userId) return new OperationResultDto { IsSuccess = false, Message = "Yetkisiz işlem." };
 
             var user = await _userRepository.GetByIdAsync(userId);
 
-            // O günün performans kaydını bul
             var todayPerformance = await _dailyPerformanceRepository
                 .GetWhere(p => p.UserId == userId && p.Date.Date == DateTime.UtcNow.Date)
                 .FirstOrDefaultAsync();
 
             if (quest.IsCompleted)
             {
-                // --- GERİ ALMA SENARYOSU (UNCHECK) ---
+                // --- GERİ ALMA (UNCHECK) ---
                 quest.IsCompleted = false;
-                quest.CompletedDate = null; // Artık hata vermeyecek
+                quest.CompletedDate = null;
 
-                // Puanları Düş
                 if (user != null) user.TotalXp -= quest.RewardPoints;
                 if (todayPerformance != null)
                 {
@@ -129,37 +126,46 @@ namespace QuestifyLife.Infrastructure.Services
             }
             else
             {
-                // --- TAMAMLAMA SENARYOSU (CHECK) ---
+                // --- TAMAMLAMA (CHECK) ---
                 quest.IsCompleted = true;
                 quest.CompletedDate = DateTime.UtcNow;
 
-                // Puanları Ekle
                 if (user != null) user.TotalXp += quest.RewardPoints;
 
-                // Günlük Performans Yoksa Oluştur
+                // FIX: Eğer performans kaydı yoksa EKLE, varsa GÜNCELLE
                 if (todayPerformance == null)
                 {
                     todayPerformance = new DailyPerformance
                     {
                         UserId = userId,
                         Date = DateTime.UtcNow,
-                        TotalPointsEarned = 0,
+                        TotalPointsEarned = quest.RewardPoints, // Direkt puanı ver
                         IsTargetReached = false
-                        // IsDayClosed varsayılan false gelir
                     };
                     await _dailyPerformanceRepository.AddAsync(todayPerformance);
+                    // BURADA UPDATE ÇAĞIRMIYORUZ, AddAsync YETERLİ
                 }
-
-                todayPerformance.TotalPointsEarned += quest.RewardPoints;
-                _dailyPerformanceRepository.Update(todayPerformance);
+                else
+                {
+                    todayPerformance.TotalPointsEarned += quest.RewardPoints;
+                    _dailyPerformanceRepository.Update(todayPerformance);
+                }
 
                 _questRepository.Update(quest);
                 if (user != null) _userRepository.Update(user);
 
                 await _questRepository.SaveAsync();
 
-                // Rozet Kontrolü
-                var newBadges = await _badgeService.CheckAndAwardBadgesAsync(quest.UserId);
+                // FIX: Rozet kontrolünü güvenli hale getirdik (Try-Catch)
+                List<string> newBadges = new List<string>();
+                try
+                {
+                    newBadges = await _badgeService.CheckAndAwardBadgesAsync(quest.UserId);
+                }
+                catch (Exception)
+                {
+                    // Rozet hatası olursa işlemi bozma, sessizce devam et
+                }
 
                 return new OperationResultDto
                 {
@@ -172,7 +178,6 @@ namespace QuestifyLife.Infrastructure.Services
             }
         }
 
-        // --- 4. GÖREV GÜNCELLEME (EDIT) ---
         public async Task<bool> UpdateQuestAsync(UpdateQuestRequest request)
         {
             var quest = await _questRepository.GetByIdAsync(request.Id);
@@ -180,7 +185,6 @@ namespace QuestifyLife.Infrastructure.Services
 
             if (quest.UserId != request.UserId) throw new Exception("Bu görevi düzenleme yetkiniz yok.");
 
-            // Bilgileri Güncelle
             quest.Title = request.Title;
             quest.Description = request.Description;
             quest.Category = request.Category ?? "Genel";
@@ -188,11 +192,9 @@ namespace QuestifyLife.Infrastructure.Services
 
             _questRepository.Update(quest);
             await _questRepository.SaveAsync();
-
             return true;
         }
 
-        // --- 5. GÖREV SİLME ---
         public async Task<bool> DeleteQuestAsync(Guid questId, Guid userId)
         {
             var quest = await _questRepository.GetByIdAsync(questId);
@@ -205,3 +207,4 @@ namespace QuestifyLife.Infrastructure.Services
         }
     }
 }
+

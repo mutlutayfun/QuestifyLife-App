@@ -6,6 +6,7 @@ import QuestItem from '../components/QuestItem';
 import AddQuestForm from '../components/AddQuestForm';
 import Layout from '../components/Layout'; // Layout import edildi
 import DayEndModal from '../components/DayEndModal'; 
+import EditQuestModal from '../components/EditQuestModal';
 import Confetti from 'react-confetti';
 import { toast } from 'react-toastify';
 
@@ -19,6 +20,7 @@ export default function Dashboard() {
 
     const [showConfetti, setShowConfetti] = useState(false);
     const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+    const [editingQuest, setEditingQuest] = useState(null);
 
     useEffect(() => {
         const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -51,33 +53,6 @@ export default function Dashboard() {
             toast.error("Görev eklenirken hata oluştu.");
         }
     };
-
-    const handleCompleteQuest = async (id) => {
-        try {
-            const response = await api.post(`/Quests/complete/${id}`);
-            
-            setShowConfetti(true);
-            setTimeout(() => setShowConfetti(false), 5000);
-
-            if(response.data.newBadges && response.data.newBadges.length > 0) {
-                toast.info(
-                    <div>
-                        <h4 className="font-bold">🏅 Yeni Rozet Kazandın!</h4>
-                        <p>{response.data.newBadges.join(", ")}</p>
-                    </div>, 
-                    { autoClose: 6000 }
-                );
-            } else {
-                toast.success(`Harika! +${response.data.earnedPoints || 10} Puan Kazandın! ✨`);
-            }
-            
-            setRefreshTrigger(prev => prev + 1);
-        } catch (error) {
-            console.error(error);
-            toast.error("İşlem başarısız.");
-        }
-    };
-
     const handleDeleteQuest = async (id) => {
         if(!confirm("Bu görevi silmek istediğine emin misin?")) return;
         
@@ -118,6 +93,50 @@ export default function Dashboard() {
             toast.error("Gün kapatılırken hata oluştu.");
         }
     };
+    const handleUpdateQuest = async (updatedQuest) => {
+        try {
+            // updatedQuest nesnesinde: id, title, description, rewardPoints, category olmalı
+            // Backend DTO'su "RewardPoints" bekliyor, dikkat et (QuestItem'dan gelen veri yapısına göre)
+            const payload = {
+                id: updatedQuest.id,
+                title: updatedQuest.title,
+                description: updatedQuest.description,
+                rewardPoints: updatedQuest.rewardPoints || updatedQuest.points, // İsimlendirme farkına dikkat
+                category: updatedQuest.category
+            };
+
+            await api.put('/Quests', payload); 
+            toast.success("Görev güncellendi! ✨");
+            setRefreshTrigger(p => p + 1); 
+        } catch (error) {
+            console.error(error);
+            toast.error("Güncelleme başarısız.");
+        }
+    };
+
+    const handleToggleQuest = async (id) => {
+        try {
+            const res = await api.post(`/Quests/toggle/${id}`);
+            const isCompletedNow = res.data.isCompleted;
+
+            if (isCompletedNow) {
+                toast.success(`Görev tamamlandı! +${res.data.earnedPoints} XP ✨`);
+                setShowConfetti(true);
+                setTimeout(() => setShowConfetti(false), 3000);
+            } else {
+                toast.info("Görev geri alındı. Puan silindi. ↩️");
+            }
+            
+            // Eğer yeni rozet varsa
+            if(res.data.newBadges && res.data.newBadges.length > 0) {
+                 toast.info(`🏅 Yeni Rozet: ${res.data.newBadges.join(", ")}`);
+            }
+
+            setRefreshTrigger(p => p + 1);
+        } catch {
+            toast.error("İşlem hatası.");
+        }
+    };
 
     if (loading) return <div className="min-h-screen flex items-center justify-center text-primary animate-pulse">Yükleniyor...</div>;
 
@@ -131,6 +150,12 @@ export default function Dashboard() {
                     onClose={() => setIsDayEndModalOpen(false)} 
                     onConfirm={handleFinishDay}
                     summary={dashboardData}
+                />
+                  <EditQuestModal 
+                    isOpen={!!editingQuest} 
+                    onClose={() => setEditingQuest(null)} 
+                    onUpdate={handleUpdateQuest} 
+                    quest={editingQuest}
                 />
 
                 <header className="bg-white shadow-sm sticky top-0 z-10">
@@ -196,8 +221,9 @@ export default function Dashboard() {
                                 <QuestItem 
                                     key={quest.id} 
                                     quest={quest} 
-                                    onComplete={handleCompleteQuest}
+                                    onToggle={handleToggleQuest}
                                     onDelete={handleDeleteQuest}
+                                    onEdit={(q) => setEditingQuest(q)}
                                 />
                             ))
                         )}
