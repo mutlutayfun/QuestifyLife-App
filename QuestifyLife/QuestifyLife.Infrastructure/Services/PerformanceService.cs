@@ -140,34 +140,43 @@ namespace QuestifyLife.Infrastructure.Services
         }
         public async Task<List<CalendarDayDto>> GetCalendarDataAsync(Guid userId, int year, int month)
         {
-            // O aya ait performans kayıtlarını çek
+            // 1. O aya ait performans (Skor/Not) verilerini çek
             var performances = await _dailyPerformanceRepository
-                .GetWhere(d => d.UserId == userId && d.Date.Year == year && d.Date.Month == month)
-                .ToListAsync();
+               .GetWhere(d => d.UserId == userId && d.Date.Year == year && d.Date.Month == month)
+               .ToListAsync();
 
+            // 2. O ay tamamlanan görevleri, TARİH ARALIĞI vererek çek
             var startDate = new DateTime(year, month, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1).AddHours(23).AddMinutes(59);
 
-            var completedQuestsInMonth = await _questRepository
+            var quests = await _questRepository
                 .GetWhere(q => q.UserId == userId &&
-                      q.IsCompleted &&
-                      q.ScheduledDate >= startDate &&
-                      q.ScheduledDate <= endDate)
-                .Select(q => new { q.ScheduledDate, q.Title }) // Bize sadece tarih ve başlık lazım
-                .ToListAsync();
+                               q.IsCompleted &&
+                               q.ScheduledDate >= startDate &&
+                               q.ScheduledDate <= endDate)
+                .ToListAsync(); // <-- ÖNEMLİ: Veriyi önce belleğe çekiyoruz (Memory)
 
+            // 3. Verileri Bellekte Birleştir (Mapping)
+            // Artık veriler bellekte olduğu için hata almazsın
             var calendarData = performances.Select(p => new CalendarDayDto
             {
                 Date = p.Date,
                 Points = p.TotalPointsEarned,
                 TargetReached = p.IsTargetReached,
                 Note = p.DayNote,
-                CompletedQuests = completedQuestsInMonth
-                    .Where(q => q.ScheduledDate.Date == p.Date.Date) // Tarih eşleşmesi
-                    .Select(q => q.Title)
+
+                // Eşleştirme Kısmı
+                CompletedQuests = quests
+                    .Where(q => q.ScheduledDate.Date == p.Date.Date) // Tarih Eşleşmesi
+                    .Select(q => new CalendarQuestDto
+                    {
+                        Title = q.Title,
+                        Category = q.Category ?? "Genel", // Kategori boşsa "Genel" yaz
+                        RewardPoints = q.RewardPoints
+                    })
                     .ToList(),
 
-                CompletedQuestCount = completedQuestsInMonth.Count(q => q.ScheduledDate.Date == p.Date.Date)
+                CompletedQuestCount = quests.Count(q => q.ScheduledDate.Date == p.Date.Date)
             }).ToList();
 
             return calendarData;
