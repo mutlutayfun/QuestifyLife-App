@@ -57,7 +57,8 @@ namespace QuestifyLife.Infrastructure.Services
                 CompletedDate = null,
                 // Ceza puanı şimdilik basit tutalım, ileride eklenebilir
                 Category = request.Category ?? "Genel",
-                ColorCode = request.ColorCode ?? "#3498db"
+                ColorCode = request.ColorCode ?? "#3498db",
+                IsPinned = false
             };
 
             await _questRepository.AddAsync(newQuest);
@@ -67,21 +68,77 @@ namespace QuestifyLife.Infrastructure.Services
         }
 
         // --- 2. BEKLEYEN GÖREVLERİ GETİR (EKSİKSİZ EKLENDİ) ---
+        // --- GÜNCELLENEN METOT: PİNLİ GÖREVLERİ OTOMATİK GETİR ---
         public async Task<List<QuestDto>> GetPendingQuestsAsync(Guid userId)
         {
-            var quests = await _questRepository
-                .GetWhere(q => q.UserId == userId && !q.IsCompleted)
+            var today = DateTime.UtcNow.Date;
+
+            // 1. ADIM: Geçmişte "Pinlenmiş" olan görevleri bul (Şablon gibi düşün)
+            // Performans için sadece son 30 günün aktif görevlerine bakıyoruz
+            var pinnedQuestsRaw = await _questRepository
+                .GetWhere(q => q.UserId == userId && q.IsPinned)
+                .OrderByDescending(q => q.ScheduledDate)
+                .ToListAsync();
+
+            // Aynı isimdeki görevlerden sadece en güncelini al (DistinctBy Title)
+            var distinctPinnedTemplates = pinnedQuestsRaw
+                .GroupBy(q => q.Title)
+                .Select(g => g.First())
+                .ToList();
+
+            foreach (var template in distinctPinnedTemplates)
+            {
+                // Bu görev şablonu BUGÜN için var mı?
+                var existsToday = await _questRepository
+                    .GetWhere(q => q.UserId == userId && q.Title == template.Title && q.ScheduledDate.Date == today)
+                    .AnyAsync();
+
+                if (!existsToday)
+                {
+                    // Yoksa, bugüne bir kopyasını oluştur!
+                    var dailyClone = new Quest
+                    {
+                        UserId = userId,
+                        Title = template.Title,
+                        Description = template.Description,
+                        RewardPoints = template.RewardPoints,
+                        Category = template.Category,
+                        ColorCode = template.ColorCode,
+                        IsPinned = true, // Klon da pinli olsun ki yarın da devam etsin
+                        IsCompleted = false,
+                        ScheduledDate = today
+                    };
+                    await _questRepository.AddAsync(dailyClone);
+                }
+            }
+            // Değişiklik varsa kaydet
+            if (distinctPinnedTemplates.Any()) await _questRepository.SaveAsync();
+
+            // 2. ADIM: Artık normal listeyi çekebiliriz
+            return await _questRepository
+                .GetWhere(q => q.UserId == userId && !q.IsCompleted && q.ScheduledDate.Date == today) // Sadece bugünün işlerini göster
                 .Select(q => new QuestDto
                 {
                     Id = q.Id,
                     Title = q.Title,
                     Description = q.Description,
                     RewardPoints = q.RewardPoints,
-                    IsCompleted = q.IsCompleted
+                    IsCompleted = q.IsCompleted,
+                    IsPinned = q.IsPinned // DTO'ya eklemeyi unutma
                 })
                 .ToListAsync();
+        }
+        public async Task<bool> TogglePinStatusAsync(Guid questId, Guid userId)
+        {
+            var quest = await _questRepository.GetByIdAsync(questId);
+            if (quest == null || quest.UserId != userId) return false;
 
-            return quests;
+            quest.IsPinned = !quest.IsPinned; // Tersine çevir
+
+            _questRepository.Update(quest);
+            await _questRepository.SaveAsync();
+
+            return quest.IsPinned;
         }
 
         // --- 3. GÖREV DURUMU DEĞİŞTİRME (TOGGLE) ---
@@ -97,6 +154,14 @@ namespace QuestifyLife.Infrastructure.Services
             var todayPerformance = await _dailyPerformanceRepository
                 .GetWhere(p => p.UserId == userId && p.Date.Date == DateTime.UtcNow.Date)
                 .FirstOrDefaultAsync();
+            if (todayPerformance != null && todayPerformance.IsDayClosed)
+            {
+                return new OperationResultDto
+                {
+                    IsSuccess = false,
+                    Message = "Gün kapandı! Artık değişiklik yapamazsın."
+                };
+            }
 
             if (quest.IsCompleted)
             {
@@ -189,6 +254,7 @@ namespace QuestifyLife.Infrastructure.Services
             quest.Description = request.Description;
             quest.Category = request.Category ?? "Genel";
             quest.RewardPoints = request.RewardPoints;
+            quest.IsPinned = request.IsPinned;
 
             _questRepository.Update(quest);
             await _questRepository.SaveAsync();

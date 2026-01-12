@@ -15,6 +15,7 @@ namespace QuestifyLife.Application.DTOs.Quests
         public string? Description { get; set; }
         public int RewardPoints { get; set; }
         public string Category { get; set; }
+        public bool IsPinned { get; set; }
     }
 }
 

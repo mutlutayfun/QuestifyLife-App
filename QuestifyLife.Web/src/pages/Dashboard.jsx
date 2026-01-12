@@ -137,6 +137,16 @@ export default function Dashboard() {
             toast.error("İşlem hatası.");
         }
     };
+    const handlePinQuest = async (id) => {
+        try {
+            const res = await api.post(`/Quests/pin/${id}`);
+            const message = res.data.message;
+            toast.info(message); // "Görev sabitlendi" veya "Kaldırıldı"
+            setRefreshTrigger(p => p + 1); // İkonu güncellemek için listeyi yenile
+        } catch {
+            toast.error("İşlem başarısız.");
+        }
+    };
 
     if (loading) return <div className="min-h-screen flex items-center justify-center text-primary animate-pulse">Yükleniyor...</div>;
 
@@ -224,6 +234,8 @@ export default function Dashboard() {
                                     onToggle={handleToggleQuest}
                                     onDelete={handleDeleteQuest}
                                     onEdit={(q) => setEditingQuest(q)}
+                                    onPin={handlePinQuest}
+                                    isDayClosed={dashboardData?.isDayClosed}
                                 />
                             ))
                         )}

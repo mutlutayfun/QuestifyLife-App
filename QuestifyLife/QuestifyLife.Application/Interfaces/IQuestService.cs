@@ -16,4 +16,5 @@ public interface IQuestService
     Task<OperationResultDto> ToggleQuestStatusAsync(Guid questId, Guid userId);// Görevi tamamla
     Task<bool> DeleteQuestAsync(Guid questId, Guid userId);
     Task<bool> UpdateQuestAsync(UpdateQuestRequest request);
+    Task<bool> TogglePinStatusAsync(Guid id, Guid userId);
 }

@@ -48,6 +48,10 @@ namespace QuestifyLife.Infrastructure.Services
             var pointsEarnedToday = todaysQuests
                 .Where(q => q.IsCompleted)
                 .Sum(q => q.RewardPoints);
+            
+            var todayPerformance = await _dailyPerformanceRepository
+                .GetWhere(d => d.UserId == userId && d.Date == today)
+                .FirstOrDefaultAsync();
 
             // DTO'yu doldur ve gönder
             return new DashboardDto
@@ -57,6 +61,7 @@ namespace QuestifyLife.Infrastructure.Services
                 DailyTarget = user.DailyTargetPoints,
                 CurrentStreak = user.CurrentStreak,
                 PointsEarnedToday = pointsEarnedToday,
+                IsDayClosed = todayPerformance != null ? todayPerformance.IsDayClosed : false,
                 TodayQuests = todaysQuests.Select(q => new QuestDto
                 {
                     Id = q.Id,

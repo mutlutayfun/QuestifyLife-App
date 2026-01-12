@@ -13,4 +13,5 @@ public class QuestDto
     public string? Description { get; set; }
     public int RewardPoints { get; set; }
     public bool IsCompleted { get; set; }
+    public bool IsPinned { get; set; }
 }

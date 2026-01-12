@@ -63,6 +63,13 @@ namespace QuestifyLife.API.Controllers
 
             return Ok(result);
         }
+        [HttpPost("pin/{id}")]
+        public async Task<IActionResult> TogglePin(Guid id)
+        {
+            var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+            var isPinned = await _questService.TogglePinStatusAsync(id, userId);
+            return Ok(new { IsPinned = isPinned, Message = isPinned ? "Görev sabitlendi (Yarın tekrar gelecek)." : "Sabitleme kaldırıldı." });
+        }
 
         [HttpDelete("{questId}")]
         public async Task<IActionResult> Delete(Guid questId)

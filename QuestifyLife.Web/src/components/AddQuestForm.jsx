@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const AddQuestForm = ({ onAdd }) => {
+const AddQuestForm = ({ onAdd, disabled }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState(""); // YENİ: Açıklama
   const [points, setPoints] = useState(10);
@@ -32,6 +32,13 @@ const AddQuestForm = ({ onAdd }) => {
     setCategory("");
     setIsOpen(false);
   };
+  if (disabled) {
+    return (
+        <div className="w-full py-4 bg-gray-100 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-bold flex items-center justify-center gap-2 cursor-not-allowed opacity-60">
+            <span>🚫</span> Gün Kapandı - Yeni Görev Eklenemez
+        </div>
+    );
+  }
 
   if (!isOpen) {
     return (
