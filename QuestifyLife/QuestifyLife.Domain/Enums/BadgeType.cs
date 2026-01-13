@@ -10,7 +10,8 @@ namespace QuestifyLife.Domain.Enums
     {
         TotalXp,        // Toplam Puan (Örn: 1000 XP)
         Streak,         // Günlük Seri (Örn: 7 Gün)
-        QuestCount,     // Toplam Görev Sayısı (Örn: 50 Görev)
+        QuestCount,
+        CategoryCount,
         GoalAchieved   // YENİ: Kategori Bazlı (Örn: 10 Spor görevi)
     }
 }

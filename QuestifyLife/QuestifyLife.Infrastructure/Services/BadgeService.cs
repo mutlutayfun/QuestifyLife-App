@@ -52,9 +52,9 @@ namespace QuestifyLife.Infrastructure.Services
                 new() { Name = "Görev Ustası", Description = "50 Görev Tamamla", IconName = "sword", Type = BadgeType.QuestCount, Threshold = 50, Rarity = "rare" },
                 new() { Name = "Efsane", Description = "100 Görev Tamamla", IconName = "dragon", Type = BadgeType.QuestCount, Threshold = 100, Rarity = "epic" },
 
-                new() { Name = "Haftanın Yıldızı", Description = "Haftalık hedefini tuttur.", IconName = "star", Type = BadgeType.GoalAchieved, Threshold = 10, Rarity = "common" },
-                new() { Name = "Ayın Elemanı", Description = "Aylık hedefini tuttur.", IconName = "star", Type = BadgeType.GoalAchieved, Threshold = 10, Rarity = "rare" },
-                new() { Name = "Yılın Efsanesi", Description = "Yıllık hedefini tuttur.", IconName = "star", Type = BadgeType.GoalAchieved, Threshold = 10, Rarity = "epic" },
+               new() { Name = "Haftanın Yıldızı", Description = "Haftalık hedefini tuttur", IconName = "rocket", Type = BadgeType.GoalAchieved, Threshold = 1, TargetContext = "Weekly", Rarity = "rare" },
+                new() { Name = "Ayın Elemanı", Description = "Aylık hedefini tuttur", IconName = "calendar", Type = BadgeType.GoalAchieved, Threshold = 1, TargetContext = "Monthly", Rarity = "epic" },
+                new() { Name = "Yılın Efsanesi", Description = "Yıllık hedefini tuttur", IconName = "target", Type = BadgeType.GoalAchieved, Threshold = 1, TargetContext = "Yearly", Rarity = "legendary" }
 
             };
 
