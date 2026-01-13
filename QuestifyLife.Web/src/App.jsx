@@ -9,6 +9,7 @@ import Friends from "./pages/Friends";
 import History from "./pages/History";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Leaderboard from './pages/Leaderboard';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -34,6 +35,7 @@ function App() {
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           
           {/* Bilinmeyen rotaları Login'e yönlendir */}
           <Route path="*" element={<Navigate to="/login" />} />

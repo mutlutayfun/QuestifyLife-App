@@ -26,6 +26,10 @@ const Navbar = () => {
                     <span className="text-2xl">👥</span>
                     <span className="text-xs font-medium">Sosyal</span>
                 </Link>
+                <Link to="/leaderboard" className={({ isActive }) => `flex flex-col items-center gap-1 ${isActive ? 'text-primary' : 'text-gray-400'}`}>
+                    <span className="text-xl">🏆</span>
+                    <span className="text-[10px] font-bold">Liderler</span>
+                </Link>
 
                 <Link to="/profile" className={`flex flex-col items-center justify-center w-full h-full ${isActive('/profile')}`}>
                     <span className="text-2xl">👤</span>

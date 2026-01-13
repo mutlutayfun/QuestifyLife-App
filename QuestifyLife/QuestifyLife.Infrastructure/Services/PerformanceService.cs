@@ -3,6 +3,7 @@ using QuestifyLife.Application.DTOs.Common;
 using QuestifyLife.Application.DTOs.Performance;
 using QuestifyLife.Application.DTOs.Quests;
 using QuestifyLife.Application.Interfaces;
+using QuestifyLife.Application.Wrappers;
 using QuestifyLife.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -185,6 +186,33 @@ namespace QuestifyLife.Infrastructure.Services
             }).ToList();
 
             return calendarData;
+        }
+        public async Task<ServiceResponse<List<LeaderboardUserDto>>> GetLeaderboardAsync(Guid currentUserId)
+        {
+            // 1. Tüm kullanıcıları XP'ye göre çoktan aza sırala
+            // Not: Gerçek bir projede milyonlarca kullanıcı varsa "Take(50)" gibi limitler koyarız.
+            var allUsers = await _userRepository.GetWhere(u => true)
+                .OrderByDescending(u => u.TotalXp)
+                .Take(50) // Performans için ilk 50 kişiyi çekelim
+                .ToListAsync();
+
+            var leaderboard = new List<LeaderboardUserDto>();
+            int rankCounter = 1;
+
+            foreach (var user in allUsers)
+            {
+                leaderboard.Add(new LeaderboardUserDto
+                {
+                    Rank = rankCounter++,
+                    Username = user.Username,
+                    // Eğer AvatarId boşsa varsayılan bir tane ata
+                    AvatarId = string.IsNullOrEmpty(user.AvatarId) ? "avatar_1" : user.AvatarId,
+                    TotalXp = user.TotalXp,
+                    IsCurrentUser = user.Id == currentUserId
+                });
+            }
+
+            return new ServiceResponse<List<LeaderboardUserDto>>(leaderboard);
         }
     }
 }

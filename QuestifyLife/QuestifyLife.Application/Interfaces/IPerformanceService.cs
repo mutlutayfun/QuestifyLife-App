@@ -1,5 +1,6 @@
 ﻿using QuestifyLife.Application.DTOs.Common;
 using QuestifyLife.Application.DTOs.Performance;
+using QuestifyLife.Application.Wrappers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,5 +20,6 @@ namespace QuestifyLife.Application.Interfaces
 
         // YENİ: Takvim Verisi
         Task<List<CalendarDayDto>> GetCalendarDataAsync(Guid userId, int year, int month);
+        Task<ServiceResponse<List<LeaderboardUserDto>>> GetLeaderboardAsync(Guid currentUserId);
     }
 }

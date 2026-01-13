@@ -45,6 +45,14 @@ namespace QuestifyLife.API.Controllers
             var data = await _performanceService.GetCalendarDataAsync(userId, year, month);
             return Ok(data);
         }
+        [HttpGet("leaderboard")]
+        public async Task<IActionResult> GetLeaderboard()
+        {
+            var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+            var response = await _performanceService.GetLeaderboardAsync(userId);
+            return Ok(response);
+        }
+
     }
-    
+
 }
