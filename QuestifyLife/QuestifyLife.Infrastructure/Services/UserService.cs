@@ -78,7 +78,9 @@ namespace QuestifyLife.Infrastructure.Services
             if (user == null) return false;
 
             if (request.DailyTargetPoints > 0)
-                user.DailyTargetPoints = request.DailyTargetPoints;
+            {
+                user.DailyTargetPoints = request.DailyTargetPoints > 200 ? 200 : request.DailyTargetPoints;
+            }
 
             // YENİ HEDEFLERİ GÜNCELLE
             if (request.WeeklyTargetPoints > 0)

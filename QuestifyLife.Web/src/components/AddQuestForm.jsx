@@ -7,6 +7,8 @@ const AddQuestForm = ({ onAdd, disabled }) => {
   const [category, setCategory] = useState(""); // YENİ: Manuel Kategori
   const [isOpen, setIsOpen] = useState(false);
 
+  const POINT_OPTIONS = [5, 10, 15, 20, 25, 30];
+
   const handleSubmit = (e) => {
     e.preventDefault();
     
@@ -78,20 +80,23 @@ const AddQuestForm = ({ onAdd, disabled }) => {
         />
       </div>
       
-      <div className="flex gap-4 mb-4">
-        {/* Puan Seçimi */}
-        <div className="flex-1">
-            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Zorluk (XP)</label>
-            <select 
-                value={points} 
-                onChange={(e) => setPoints(e.target.value)}
-                className="w-full p-2 border border-gray-100 rounded-lg bg-gray-50 text-sm"
-            >
-                <option value="10">Kolay (10 XP)</option>
-                <option value="20">Orta (20 XP)</option>
-                <option value="50">Zor (50 XP)</option>
-                <option value="100">Efsanevi (100 XP)</option>
-            </select>
+         <div className="mb-4">
+        <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Ödül Puanı (XP)</label>
+        <div className="flex justify-between gap-1">
+            {POINT_OPTIONS.map((opt) => (
+                <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setPoints(opt)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-black transition-all border-2
+                        ${points === opt 
+                            ? 'border-orange-400 bg-orange-50 text-orange-500 scale-105 shadow-sm' 
+                            : 'border-gray-100 bg-white text-gray-400 hover:border-orange-200'}
+                    `}
+                >
+                    +{opt}
+                </button>
+            ))}
         </div>
 
         {/* Kategori Girişi */}
