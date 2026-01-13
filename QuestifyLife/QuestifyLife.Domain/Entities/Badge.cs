@@ -1,4 +1,5 @@
 ﻿using QuestifyLife.Domain.Common;
+using QuestifyLife.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,16 +18,12 @@ namespace QuestifyLife.Domain.Entities
         // Örn: Type="Streak", Threshold=7 (7 gün seri yap)
         public BadgeType Type { get; set; }
         public int Threshold { get; set; }
+        public string Rarity { get; set; } = "common"; // common, rare, epic, legendary
+        public string? TargetContext { get; set; } // Eğer Type=CategoryCount ise buraya "Spor", "Yazılım" yazacağız.
 
         public ICollection<UserBadge> UserBadges { get; set; } = new List<UserBadge>();
     }
 
-    public enum BadgeType
-    {
-        TotalXp,       // Toplam Puan
-        Streak,        // Günlük Seri
-        QuestCount     // Tamamlanan Görev Sayısı
-    }
 
     // Çoka-Çok İlişki Tablosu (Hangi kullanıcı hangi rozeti ne zaman aldı?)
     public class UserBadge : BaseEntity

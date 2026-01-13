@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QuestifyLife.Infrastructure.Persistence.Contexts;
 
@@ -11,9 +12,11 @@ using QuestifyLife.Infrastructure.Persistence.Contexts;
 namespace QuestifyLife.Infrastructure.Migrations
 {
     [DbContext(typeof(QuestifyLifeDbContext))]
-    partial class QuestifyLifeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260113095947_UpdateBadgeEntity")]
+    partial class UpdateBadgeEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -234,9 +237,6 @@ namespace QuestifyLife.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<int>("MonthlyTargetPoints")
-                        .HasColumnType("int");
-
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -253,12 +253,6 @@ namespace QuestifyLife.Infrastructure.Migrations
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("WeeklyTargetPoints")
-                        .HasColumnType("int");
-
-                    b.Property<int>("YearlyTargetPoints")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 

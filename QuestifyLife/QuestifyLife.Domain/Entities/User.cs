@@ -20,8 +20,10 @@ public class User : BaseEntity
     public int DailyTargetPoints { get; set; } = 100; // Varsayılan hedef
     public int TotalXp { get; set; } = 0; // Genel tecrübe puanı (Level sistemi için)
     public int CurrentStreak { get; set; } = 0; // Kaç gündür hedefe ulaşıyor?
-    
 
+    public int WeeklyTargetPoints { get; set; } = 500;
+    public int MonthlyTargetPoints { get; set; } = 2000;
+    public int YearlyTargetPoints { get; set; } = 20000;
     // İLİŞKİLER
     public ICollection<Quest> Quests { get; set; } = new List<Quest>();
     public ICollection<DailyPerformance> DailyPerformances { get; set; } = new List<DailyPerformance>();

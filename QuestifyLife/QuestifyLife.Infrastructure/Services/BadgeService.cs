@@ -2,10 +2,10 @@
 using QuestifyLife.Application.DTOs.Badges;
 using QuestifyLife.Application.Interfaces;
 using QuestifyLife.Domain.Entities;
+using QuestifyLife.Domain.Enums; // <--- BU SATIR BADGETYPE HATASINI ÇÖZER
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace QuestifyLife.Infrastructure.Services
@@ -31,16 +31,31 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task SeedBadgesAsync()
         {
-            // Eğer veritabanı boşsa varsayılan rozetleri ekle
             if (await _badgeRepository.GetWhere(x => true).AnyAsync()) return;
 
             var badges = new List<Badge>
             {
-                new Badge { Name = "Çaylak", Description = "İlk 100 Puanı Kazan", IconName = "star", Type = BadgeType.TotalXp, Threshold = 100 },
-                new Badge { Name = "Usta", Description = "1000 Puana Ulaş", IconName = "crown", Type = BadgeType.TotalXp, Threshold = 1000 },
-                new Badge { Name = "İstikrarlı", Description = "3 Günlük Seri Yap", IconName = "fire", Type = BadgeType.Streak, Threshold = 3 },
-                new Badge { Name = "Yenilmez", Description = "7 Günlük Seri Yap", IconName = "dragon", Type = BadgeType.Streak, Threshold = 7 },
-                new Badge { Name = "Görev Adamı", Description = "10 Görev Tamamla", IconName = "check-double", Type = BadgeType.QuestCount, Threshold = 10 }
+                // Enum kullanımı burada yapılıyor, yukarıdaki using sayesinde hata vermez
+                new() { Name = "Çaylak", Description = "İlk 100 Puanı Kazan", IconName = "star", Type = BadgeType.TotalXp, Threshold = 100, Rarity = "common" },
+                new() { Name = "Bronz Kupa", Description = "1.000 XP'ye Ulaş", IconName = "trophy_bronze", Type = BadgeType.TotalXp, Threshold = 1000, Rarity = "common" },
+                new() { Name = "Gümüş Kupa", Description = "5.000 XP'ye Ulaş", IconName = "trophy_silver", Type = BadgeType.TotalXp, Threshold = 5000, Rarity = "rare" },
+                new() { Name = "Altın Kupa", Description = "10.000 XP'ye Ulaş", IconName = "trophy_gold", Type = BadgeType.TotalXp, Threshold = 10000, Rarity = "epic" },
+                new() { Name = "Elmas Kupa", Description = "50.000 XP'ye Ulaş", IconName = "diamond", Type = BadgeType.TotalXp, Threshold = 50000, Rarity = "legendary" },
+
+                new() { Name = "İstikrarlı", Description = "3 Günlük Seri Yap", IconName = "flame", Type = BadgeType.Streak, Threshold = 3, Rarity = "common" },
+                new() { Name = "Haftalık Savaşçı", Description = "7 Günlük Seri Yap", IconName = "shield", Type = BadgeType.Streak, Threshold = 7, Rarity = "rare" },
+                new() { Name = "Disiplin Abidesi", Description = "30 Günlük Seri Yap", IconName = "gem", Type = BadgeType.Streak, Threshold = 30, Rarity = "epic" },
+                new() { Name = "Yenilmez", Description = "100 Günlük Seri Yap", IconName = "crown", Type = BadgeType.Streak, Threshold = 100, Rarity = "legendary" },
+
+                new() { Name = "İlk Adım", Description = "İlk Görevini Tamamla", IconName = "scroll", Type = BadgeType.QuestCount, Threshold = 1, Rarity = "common" },
+                new() { Name = "Görev Avcısı", Description = "10 Görev Tamamla", IconName = "dagger", Type = BadgeType.QuestCount, Threshold = 10, Rarity = "common" },
+                new() { Name = "Görev Ustası", Description = "50 Görev Tamamla", IconName = "sword", Type = BadgeType.QuestCount, Threshold = 50, Rarity = "rare" },
+                new() { Name = "Efsane", Description = "100 Görev Tamamla", IconName = "dragon", Type = BadgeType.QuestCount, Threshold = 100, Rarity = "epic" },
+
+                new() { Name = "Haftanın Yıldızı", Description = "Haftalık hedefini tuttur.", IconName = "star", Type = BadgeType.GoalAchieved, Threshold = 10, Rarity = "common" },
+                new() { Name = "Ayın Elemanı", Description = "Aylık hedefini tuttur.", IconName = "star", Type = BadgeType.GoalAchieved, Threshold = 10, Rarity = "rare" },
+                new() { Name = "Yılın Efsanesi", Description = "Yıllık hedefini tuttur.", IconName = "star", Type = BadgeType.GoalAchieved, Threshold = 10, Rarity = "epic" },
+
             };
 
             foreach (var b in badges) await _badgeRepository.AddAsync(b);
@@ -52,27 +67,48 @@ namespace QuestifyLife.Infrastructure.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return new List<string>();
 
-            int completedQuestCount = await _questRepository.GetWhere(q => q.UserId == userId && q.IsCompleted).CountAsync();
-            var allBadges = await _badgeRepository.GetAllAsync();
-            var earnedBadgeIds = await _userBadgeRepository.GetWhere(ub => ub.UserId == userId).Select(ub => ub.BadgeId).ToListAsync();
+            var completedQuests = await _questRepository.GetWhere(q => q.UserId == userId && q.IsCompleted).ToListAsync();
+            int totalQuestCount = completedQuests.Count;
 
-            var newEarnedBadges = new List<string>(); // Yeni kazanılanları burada toplayacağız
+            var categoryCounts = completedQuests
+                .GroupBy(q => q.Category)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var allBadges = await _badgeRepository.GetAllAsync();
+            var earnedBadgeIds = await _userBadgeRepository
+                .GetWhere(ub => ub.UserId == userId)
+                .Select(ub => ub.BadgeId)
+                .ToListAsync();
+
+            var newEarnedBadges = new List<string>();
 
             foreach (var badge in allBadges)
             {
                 if (earnedBadgeIds.Contains(badge.Id)) continue;
 
                 bool isEarned = false;
+
                 switch (badge.Type)
                 {
                     case BadgeType.TotalXp:
                         if (user.TotalXp >= badge.Threshold) isEarned = true;
                         break;
+
                     case BadgeType.Streak:
                         if (user.CurrentStreak >= badge.Threshold) isEarned = true;
                         break;
+
                     case BadgeType.QuestCount:
-                        if (completedQuestCount >= badge.Threshold) isEarned = true;
+                        if (totalQuestCount >= badge.Threshold) isEarned = true;
+                        break;
+
+                    case BadgeType.GoalAchieved:
+                        if (!string.IsNullOrEmpty(badge.TargetContext) &&
+                            categoryCounts.ContainsKey(badge.TargetContext) &&
+                            categoryCounts[badge.TargetContext] >= badge.Threshold)
+                        {
+                            isEarned = true;
+                        }
                         break;
                 }
 
@@ -85,7 +121,6 @@ namespace QuestifyLife.Infrastructure.Services
                         EarnedDate = DateTime.UtcNow
                     });
 
-                    // Listeye ekle ki kullanıcıya müjdeyi verelim!
                     newEarnedBadges.Add(badge.Name);
                 }
             }
@@ -95,7 +130,7 @@ namespace QuestifyLife.Infrastructure.Services
                 await _userBadgeRepository.SaveAsync();
             }
 
-            return newEarnedBadges; // Listeyi geri dön
+            return newEarnedBadges;
         }
 
         public async Task<List<BadgeDto>> GetUserBadgesAsync(Guid userId)
@@ -114,12 +149,17 @@ namespace QuestifyLife.Infrastructure.Services
                     Name = badge.Name,
                     Description = badge.Description,
                     IconName = badge.IconName,
-                    IsEarned = earned != null, // Kazanıldı mı?
+                    Rarity = badge.Rarity,
+                    IsEarned = earned != null,
                     EarnedDate = earned?.EarnedDate
                 });
             }
 
-            return result;
+            return result
+                .OrderByDescending(b => b.IsEarned)
+                .ThenByDescending(b => b.Rarity == "legendary")
+                .ThenByDescending(b => b.Rarity == "epic")
+                .ToList();
         }
     }
 }
