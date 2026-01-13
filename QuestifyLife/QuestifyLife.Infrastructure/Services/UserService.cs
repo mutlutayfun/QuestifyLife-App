@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore; // ToListAsync için gerekli
 using QuestifyLife.Application.DTOs.Auth; // DTO'lar için
 using QuestifyLife.Application.Interfaces;
+using QuestifyLife.Application.Wrappers;
 using QuestifyLife.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -71,6 +72,29 @@ namespace QuestifyLife.Infrastructure.Services
                 Badges = allBadges
             };
         }
+        public async Task<ServiceResponse<PublicUserProfileDto>> GetPublicUserProfileAsync(Guid targetUserId)
+        {
+            var user = await _userRepository.GetByIdAsync(targetUserId);
+            if (user == null) return new ServiceResponse<PublicUserProfileDto> { Success = false, Message = "Kullanıcı bulunamadı." };
+
+            // Kullanıcının sadece KAZANDIĞI rozetleri çekelim
+            var allBadges = await _badgeService.GetUserBadgesAsync(targetUserId);
+            var earnedBadges = allBadges.Where(b => b.IsEarned).ToList();
+
+            var publicProfile = new PublicUserProfileDto
+            {
+                Username = user.Username,
+                AvatarId = user.AvatarId,
+                TotalXp = user.TotalXp,
+                CurrentStreak = user.CurrentStreak,
+                PersonalManifesto = user.PersonalManifesto,
+                JoinDate = user.CreatedDate,
+                EarnedBadges = earnedBadges
+            };
+
+            return new ServiceResponse<PublicUserProfileDto>(publicProfile);
+        }
+
 
         public async Task<bool> UpdateProfileAsync(Guid userId, UpdateProfileDto request)
         {

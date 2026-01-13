@@ -3,6 +3,7 @@ import api from '../api/axiosConfig';
 import Layout from '../components/Layout';
 import LeaderboardItem from '../components/LeaderboardItem';
 import { toast } from 'react-toastify';
+import UserProfileModal from '../components/UserProfileModal';
 
 export default function Friends() {
     const [activeTab, setActiveTab] = useState('leaderboard'); // leaderboard, add, requests
@@ -12,6 +13,7 @@ export default function Friends() {
     const [leaderboard, setLeaderboard] = useState([]);
     const [requests, setRequests] = useState([]);
     const [emailToAdd, setEmailToAdd] = useState("");
+    const [viewProfileId, setViewProfileId] = useState(null);
 
     useEffect(() => {
         if (activeTab === 'leaderboard') fetchLeaderboard();
@@ -111,7 +113,7 @@ export default function Friends() {
                 {!loading && activeTab === 'leaderboard' && (
                     <div className="space-y-2">
                         {leaderboard.map((friend, index) => (
-                            <div key={friend.friendId} className="relative group">
+                            <div key={friend.friendId} onClick={() => setViewProfileId(friend.friendId)} className="relative group">
                                 <LeaderboardItem 
                                     rank={index + 1} 
                                     user={friend} 
@@ -187,6 +189,13 @@ export default function Friends() {
                     </div>
                 )}
             </div>
+            {/* Modal */}
+            {viewProfileId && (
+                <UserProfileModal 
+                    userId={viewProfileId} 
+                    onClose={() => setViewProfileId(null)} 
+                />
+            )}
         </Layout>
     );
 }

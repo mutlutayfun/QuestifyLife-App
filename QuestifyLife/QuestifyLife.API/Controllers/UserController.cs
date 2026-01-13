@@ -36,5 +36,13 @@ namespace QuestifyLife.API.Controllers
             if (result) return Ok(new { message = "Profil güncellendi." });
             return BadRequest("Güncelleme başarısız.");
         }
+        [HttpGet("public/{userId}")]
+        public async Task<IActionResult> GetPublicProfile(Guid userId)
+        {
+            var response = await _userService.GetPublicUserProfileAsync(userId);
+            if (!response.Success) return NotFound(response);
+            return Ok(response);
+        }
+
     }
 }

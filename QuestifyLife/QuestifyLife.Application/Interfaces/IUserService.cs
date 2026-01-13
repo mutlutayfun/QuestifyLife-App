@@ -1,4 +1,5 @@
 ﻿using QuestifyLife.Application.DTOs.Auth;
+using QuestifyLife.Application.Wrappers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,5 +12,6 @@ namespace QuestifyLife.Application.Interfaces
     {
         Task<UserProfileDto> GetProfileAsync(Guid userId);
         Task<bool> UpdateProfileAsync(Guid userId, UpdateProfileDto request);
+        Task<ServiceResponse<PublicUserProfileDto>> GetPublicUserProfileAsync(Guid targetUserId);
     }
 }

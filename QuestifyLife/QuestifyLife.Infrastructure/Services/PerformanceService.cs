@@ -203,6 +203,7 @@ namespace QuestifyLife.Infrastructure.Services
             {
                 leaderboard.Add(new LeaderboardUserDto
                 {
+                    UserId = user.Id,
                     Rank = rankCounter++,
                     Username = user.Username,
                     // Eğer AvatarId boşsa varsayılan bir tane ata
