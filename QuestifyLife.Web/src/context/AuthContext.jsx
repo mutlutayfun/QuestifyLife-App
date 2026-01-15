@@ -48,10 +48,11 @@ export const AuthProvider = ({ children }) => {
         return "Sunucu ile bağlantı kurulamadı veya beklenmeyen bir hata oluştu.";
     };
 
-    // Giriş Fonksiyonu
-    const login = async (email, password) => {
+    // Giriş Fonksiyonu (GÜNCELLENDİ: usernameOrEmail)
+    const login = async (usernameOrEmail, password) => {
         try {
-            const response = await api.post("/Auth/login", { email, password });
+            // Backend'e "usernameOrEmail" olarak gönderiyoruz
+            const response = await api.post("/Auth/login", { usernameOrEmail, password });
             
             const { token, user } = response.data;
             localStorage.setItem("token", token);

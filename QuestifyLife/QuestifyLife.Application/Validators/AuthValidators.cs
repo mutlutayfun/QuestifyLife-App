@@ -32,9 +32,8 @@ namespace QuestifyLife.Application.Validators
     {
         public LoginRequestValidator()
         {
-            RuleFor(x => x.Email)
-                .NotEmpty().WithMessage("Email adresi gereklidir.")
-                .EmailAddress().WithMessage("Email formatı hatalı.");
+            RuleFor(x => x.UsernameOrEmail)
+               .NotEmpty().WithMessage("Kullanıcı adı veya E-posta gereklidir.");
 
             RuleFor(x => x.Password)
                 .NotEmpty().WithMessage("Şifre gereklidir.");

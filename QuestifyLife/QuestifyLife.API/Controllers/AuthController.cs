@@ -58,7 +58,7 @@ namespace QuestifyLife.API.Controllers
 
             if (user == null)
             {
-                return Unauthorized(new { message = "Email veya şifre hatalı." });
+                return Unauthorized(new { message = "Kullanıcı adı/E-posta veya şifre hatalı." });
             }
 
             // KULLANICI DOĞRUYSA TOKEN ÜRET

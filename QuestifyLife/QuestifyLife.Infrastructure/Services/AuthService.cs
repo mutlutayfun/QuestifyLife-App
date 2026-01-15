@@ -28,6 +28,13 @@ namespace QuestifyLife.Infrastructure.Services
                 throw new Exception("Bu email adresi zaten kullanılıyor.");
             }
 
+            // Ayrıca Username kontrolü de yapmak iyi olur (Opsiyonel ama önerilir)
+            var existingUsername = await _userRepository.GetWhere(u => u.Username == request.Username).FirstOrDefaultAsync();
+            if (existingUsername != null)
+            {
+                throw new Exception("Bu kullanıcı adı zaten kullanılıyor.");
+            }
+
             // 2. Şifreyi Hash'le (IPasswordHasher kullanıyoruz)
             var passwordHash = _passwordHasher.Generate(request.Password);
 
@@ -51,8 +58,12 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<User?> LoginAsync(LoginRequest request)
         {
-            // 1. Kullanıcıyı bul
-            var user = await _userRepository.GetWhere(u => u.Email == request.Email).FirstOrDefaultAsync();
+            // 1. Kullanıcıyı bul (HEM USERNAME HEM EMAIL KONTROLÜ)
+            // request.UsernameOrEmail değeri veritabanındaki Username YA DA Email ile eşleşiyor mu?
+            var user = await _userRepository
+                .GetWhere(u => u.Email == request.UsernameOrEmail || u.Username == request.UsernameOrEmail)
+                .FirstOrDefaultAsync();
+
             if (user == null) return null;
 
             // 2. Şifreyi doğrula (IPasswordHasher kullanıyoruz)
@@ -63,10 +74,9 @@ namespace QuestifyLife.Infrastructure.Services
             return user;
         }
 
-        // --- DÜZELTİLEN METOT ---
         public async Task<ServiceResponse<bool>> ChangePasswordAsync(Guid userId, string oldPassword, string newPassword)
         {
-            // 1. Kullanıcıyı Repository üzerinden bul (_context yerine _userRepository)
+            // 1. Kullanıcıyı Repository üzerinden bul
             var user = await _userRepository.GetWhere(u => u.Id == userId).FirstOrDefaultAsync();
 
             if (user == null)
@@ -74,8 +84,7 @@ namespace QuestifyLife.Infrastructure.Services
                 return new ServiceResponse<bool> { Success = false, Message = "Kullanıcı bulunamadı." };
             }
 
-            // 2. Mevcut şifreyi kontrol et (IPasswordHasher kullanıyoruz)
-            // Verify metodunu kullanarak eski şifrenin doğruluğunu test ediyoruz
+            // 2. Mevcut şifreyi kontrol et
             if (!_passwordHasher.Verify(oldPassword, user.PasswordHash))
             {
                 return new ServiceResponse<bool> { Success = false, Message = "Mevcut şifreniz hatalı." };
@@ -86,7 +95,6 @@ namespace QuestifyLife.Infrastructure.Services
 
             // 4. Kullanıcı bilgilerini güncelle
             user.PasswordHash = newPasswordHash;
-            // PasswordSalt güncellemesine gerek yok, hasher tek bir string üretiyor
 
             // 5. Kaydet
             _userRepository.Update(user);
