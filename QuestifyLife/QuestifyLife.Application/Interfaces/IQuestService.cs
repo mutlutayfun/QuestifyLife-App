@@ -12,7 +12,7 @@ namespace QuestifyLife.Application.Interfaces;
 public interface IQuestService
 {
     Task<Quest> CreateQuestAsync(CreateQuestRequest request);
-    Task<List<QuestDto>> GetPendingQuestsAsync(Guid userId); // Yapılacaklar
+    Task<List<QuestDto>> GetPendingQuestsAsync(Guid userId, DateTime? date = null); // Yapılacaklar
     Task<List<QuestDto>> GetPinnedTemplatesAsync(Guid userId);
     Task<OperationResultDto> ToggleQuestStatusAsync(Guid questId, Guid userId);// Görevi tamamla
     Task<bool> DeleteQuestAsync(Guid questId, Guid userId);

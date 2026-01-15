@@ -16,4 +16,5 @@ public class QuestDto
     public bool IsPinned { get; set; }
     public string ColorCode { get; set; }
     public string Category { get; set; }
+    public DateTime? ScheduledDate { get; set; }
 }

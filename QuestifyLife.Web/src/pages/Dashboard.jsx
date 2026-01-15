@@ -9,6 +9,8 @@ import DayEndModal from '../components/DayEndModal';
 import EditQuestModal from '../components/EditQuestModal';
 import Confetti from 'react-confetti';
 import { toast } from 'react-toastify';
+import { format, addDays, isSameDay } from 'date-fns'; // npm install date-fns
+import { tr } from 'date-fns/locale'; 
 
 export default function Dashboard() {
     const { user, logout } = useContext(AuthContext);
@@ -17,12 +19,15 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     
+    // YENİ: Seçili Tarih State'i (Varsayılan Bugün)
+    const [selectedDate, setSelectedDate] = useState(new Date());
+
     const [isDayEndModalOpen, setIsDayEndModalOpen] = useState(false);
     const [showConfetti, setShowConfetti] = useState(false);
     const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
     const [editingQuest, setEditingQuest] = useState(null);
 
-    // Pencere boyutu izleme
+    // Pencere boyutu izleme (Konfeti için)
     useEffect(() => {
         const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
         window.addEventListener('resize', handleResize);
@@ -33,11 +38,15 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Backend'den Dashboard verisini çekiyoruz
-                const response = await api.get('/Performance/dashboard');
+                // Backend'e tarih parametresi gönderiyoruz (ISO formatında)
+                // Eğer backend 'date' parametresini destekliyorsa o güne ait veriyi dönecek.
+                // Desteklemiyorsa (eski backend) sadece bugünü dönecek.
+                const formattedDate = selectedDate.toISOString();
+                const response = await api.get(`/Performance/dashboard?date=${formattedDate}`);
                 
                 setDashboardData(response.data);
                 
+                // Pinlenen şablonlar tarihten bağımsız gelir (genelde ayrı bir liste veya dashboard içinde)
                 if (response.data.pinnedTemplates) {
                     setPinnedTemplates(response.data.pinnedTemplates);
                 } else {
@@ -47,29 +56,56 @@ export default function Dashboard() {
             } catch (error) {
                 console.error("Veri hatası:", error);
                 if(error.response?.status === 401) logout();
+                // Veri çekme hatası kritik değilse kullanıcıya göstermeyebiliriz veya hafif bir uyarı verebiliriz.
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [refreshTrigger, logout]);
+    }, [refreshTrigger, logout, selectedDate]); // Tarih veya trigger değişince yenile
 
-    // MANUEL GÖREV EKLEME (Senin Orijinal Kodun)
+    // TARİH DEĞİŞTİRME FONKSİYONLARI
+    const handlePrevDay = () => {
+        setSelectedDate(prev => addDays(prev, -1));
+    };
+
+    const handleNextDay = () => {
+        setSelectedDate(prev => addDays(prev, 1));
+    };
+    
+    const handleGoToday = () => {
+        setSelectedDate(new Date());
+    };
+
+    // Bugün mü kontrolü
+    const isToday = isSameDay(selectedDate, new Date());
+    // Gelecek mi kontrolü (Tiklemeyi engellemek için)
+    const isFuture = selectedDate > new Date() && !isToday;
+
+    // GÖREV EKLEME (Seçili tarihe ekler)
     const handleAddQuest = async (questData) => {
         try {
-            await api.post('/Quests', questData);
+            const payload = {
+                ...questData,
+                scheduledDate: selectedDate.toISOString() // Seçili güne ekle
+            };
+            
+            await api.post('/Quests', payload);
             setRefreshTrigger(prev => prev + 1);
             toast.success("Görev başarıyla eklendi! 🚀");
         } catch (error) {
             console.error(error);
-            toast.error("Görev eklenirken hata oluştu.");
+            // HATA YÖNETİMİ İYİLEŞTİRİLDİ
+            // Backend'den gelen özel mesajı al, yoksa varsayılan mesajı göster
+            const errorMessage = error.response?.data?.message || "Görev ekleme başarısız.(Günlük Puan sınırına ulaşılmış olabilir.)";
+            toast.error(errorMessage);
         }
     };
 
-    // ŞABLONDAN EKLEME
+    // ŞABLONDAN EKLEME (Seçili tarihe ekler)
     const handleAddFromTemplate = async (template) => {
-        if (dashboardData?.isDayClosed) {
-            toast.warning("Gün kapandı, yeni görev ekleyemezsin!");
+        if (isToday && dashboardData?.isDayClosed) {
+            toast.warning("Bugün kapandı, yeni görev ekleyemezsin!");
             return;
         }
 
@@ -79,20 +115,21 @@ export default function Dashboard() {
             rewardPoints: template.rewardPoints,
             category: template.category || "Genel",
             colorCode: template.colorCode || "#3498db",
-            scheduledDate: new Date().toISOString()
+            scheduledDate: selectedDate.toISOString() // Seçili güne ekle
         };
 
         try {
             await api.post('/Quests', newQuestData);
             setRefreshTrigger(prev => prev + 1);
-            toast.success(`"${template.title}" bugüne eklendi! 🚀`);
+            toast.success(`"${template.title}" listeye eklendi! 🚀`);
         } catch (error) {
             console.error(error);
-            toast.error("Ekleme başarısız.");
+            // HATA YÖNETİMİ İYİLEŞTİRİLDİ
+            const errorMessage = error.response?.data?.message || "Şablondan ekleme başarısız.(Günlük Puan sınırına ulaşılmış olabilir.)";
+            toast.error(errorMessage);
         }
     };
 
-    // GÖREV SİLME
     const handleDeleteQuest = async (id) => {
         if(!confirm("Bu görevi silmek istediğine emin misin?")) return;
         try {
@@ -101,11 +138,11 @@ export default function Dashboard() {
             toast.info("Görev silindi.");
         } catch (error) {
             console.error(error);
-            toast.error("Silinemedi.");
+            const errorMessage = error.response?.data?.message || "Silme işlemi başarısız.";
+            toast.error(errorMessage);
         }
     };
 
-    // GÜNÜ BİTİRME
     const handleFinishDay = async (note) => {
         try {
             const response = await api.post('/Performance/finish-day', { note });
@@ -127,11 +164,11 @@ export default function Dashboard() {
 
         } catch (error) {
             console.error(error);
-            toast.error("Gün kapatılırken hata oluştu.");
+            const errorMessage = error.response?.data?.message || "Gün kapatılırken hata oluştu.";
+            toast.error(errorMessage);
         }
     };
 
-    // GÖREV GÜNCELLEME
     const handleUpdateQuest = async (updatedQuest) => {
         try {
             const payload = {
@@ -139,7 +176,8 @@ export default function Dashboard() {
                 title: updatedQuest.title,
                 description: updatedQuest.description,
                 rewardPoints: updatedQuest.rewardPoints || updatedQuest.points, 
-                category: updatedQuest.category
+                category: updatedQuest.category,
+                // Pin durumu update ile değil, ayrı endpoint ile değişiyor
             };
 
             await api.put('/Quests', payload); 
@@ -147,16 +185,28 @@ export default function Dashboard() {
             setRefreshTrigger(p => p + 1); 
         } catch (error) {
             console.error(error);
-            toast.error("Güncelleme başarısız.");
+            const errorMessage = error.response?.data?.message || "Güncelleme başarısız.";
+            toast.error(errorMessage);
         }
     };
 
-    // GÖREV TAMAMLAMA/GERİ ALMA
+    // GÖREV TAMAMLAMA (Kısıtlama Eklendi)
     const handleToggleQuest = async (id) => {
+        // YENİ: Gelecek görevler tamamlanamaz
+        if (isFuture) {
+            toast.warning("Acele etme! Bu görev yarına ait. ⏳");
+            return;
+        }
+
         try {
             const res = await api.post(`/Quests/toggle/${id}`);
             
             if(res.data) {
+                if(!res.data.isSuccess && res.data.message) {
+                    toast.warning(res.data.message); // Başarısız işlem mesajı (örn: Gün kapalı)
+                    return;
+                }
+
                 const isCompletedNow = res.data.isCompleted;
 
                 if (isCompletedNow) {
@@ -172,22 +222,22 @@ export default function Dashboard() {
                 }
                 setRefreshTrigger(p => p + 1);
             }
-        } catch {
-            toast.error("İşlem hatası.");
+        } catch (error) {
+            console.error(error);
+            const errorMessage = error.response?.data?.message || "İşlem sırasında hata oluştu.";
+            toast.error(errorMessage);
         }
     };
 
-    // GÖREVİ PINLEME / UNPIN YAPMA
     const handlePinQuest = async (id) => {
         try {
             const res = await api.post(`/Quests/pin/${id}`);
-            
-            // Eğer pinlendiyse veya kaldırıldıysa mesaj göster
             toast.info(res.data.message || "İşlem başarılı"); 
-            
             setRefreshTrigger(p => p + 1); 
-        } catch {
-            toast.error("İşlem başarısız.");
+        } catch (error) {
+            console.error(error);
+            const errorMessage = error.response?.data?.message || "Pinleme işlemi başarısız.";
+            toast.error(errorMessage);
         }
     };
 
@@ -215,48 +265,70 @@ export default function Dashboard() {
                     <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
                         <div>
                             <h1 className="text-xl font-bold text-primary tracking-tight">QuestifyLife</h1>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Ana Sayfa</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                {/* Başlık Dinamik Oldu */}
+                                {isToday ? "Bugün" : format(selectedDate, 'd MMMM', { locale: tr })}
+                            </p>
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="text-sm text-gray-600 font-medium">{user?.username}</span>
-                            <button 
-                                onClick={() => setIsDayEndModalOpen(true)}
-                                className="bg-dark text-white text-xs px-3 py-1.5 rounded-full font-bold hover:bg-gray-800 transition shadow-sm flex items-center gap-1"
-                            >
-                                <span>🌙</span> Bitir
-                            </button>
+                            {/* Bitir Butonu sadece BUGÜN ise aktif olsun */}
+                            {isToday && (
+                                <button 
+                                    onClick={() => setIsDayEndModalOpen(true)}
+                                    className="bg-dark text-white text-xs px-3 py-1.5 rounded-full font-bold hover:bg-gray-800 transition shadow-sm flex items-center gap-1"
+                                >
+                                    <span>🌙</span> Bitir
+                                </button>
+                            )}
                         </div>
                     </div>
                 </header>
 
                 <main className="max-w-md mx-auto px-4 py-6 animate-fade-in-up space-y-6">
                     
-                    {/* İSTATİSTİK KARTLARI */}
-                    <div className="flex justify-between items-end">
-                        <h2 className="text-2xl font-bold text-gray-800">Ana Sayfa</h2>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <StatsCard 
-                            title="Günlük Puan" 
-                            value={`${dashboardData?.pointsEarnedToday} / ${dashboardData?.dailyTarget}`} 
-                            icon="🎯" 
-                            color="border-primary"
-                        />
-                        <StatsCard 
-                            title="Seri (Gün)" 
-                            value={dashboardData?.currentStreak} 
-                            icon="🔥" 
-                            color="border-secondary" 
-                        />
-                    </div>
-
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center transform transition hover:scale-105 duration-300">
-                        <div>
-                            <p className="text-gray-500 text-xs font-bold uppercase">Toplam XP</p>
-                            <p className="text-2xl font-bold text-dark">{dashboardData?.totalXp}</p>
+                    {/* İSTATİSTİK KARTLARI (Sadece Bugün Gösterilir) */}
+                    {isToday ? (
+                        <div className="grid grid-cols-2 gap-3">
+                            <StatsCard 
+                                title="Günlük Puan" 
+                                value={`${dashboardData?.pointsEarnedToday} / ${dashboardData?.dailyTarget}`} 
+                                icon="🎯" 
+                                color="border-primary"
+                            />
+                            <StatsCard 
+                                title="Seri (Gün)" 
+                                value={dashboardData?.currentStreak} 
+                                icon="🔥" 
+                                color="border-secondary" 
+                            />
                         </div>
-                        <div className="text-4xl animate-bounce-slow">👑</div>
+                    ) : (
+                        // Yarın için Planlama Modu Uyarısı
+                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center">
+                            <h3 className="text-blue-800 font-bold">📅 Planlama Modu</h3>
+                            <p className="text-xs text-blue-600">Yarını şimdiden planlayarak güne önde başla!</p>
+                        </div>
+                    )}
+                    
+                    {/* YENİ: TARİH NAVİGASYONU */}
+                    <div className="flex items-center justify-between bg-gray-50 p-1.5 rounded-xl border border-gray-100">
+                        <button onClick={handlePrevDay} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-500 hover:text-primary transition">
+                            ◀
+                        </button>
+                        
+                        <div className="flex flex-col items-center cursor-pointer" onClick={handleGoToday}>
+                            <span className={`text-sm font-bold ${isToday ? 'text-primary' : 'text-gray-600'}`}>
+                                {isToday ? 'BUGÜN' : format(selectedDate, 'EEEE', { locale: tr })}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                                {format(selectedDate, 'd MMMM yyyy', { locale: tr })}
+                            </span>
+                        </div>
+
+                        <button onClick={handleNextDay} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-500 hover:text-primary transition">
+                            ▶
+                        </button>
                     </div>
 
                     {/* SIK KULLANILANLAR (PİNLENENLER) */}
@@ -270,16 +342,13 @@ export default function Dashboard() {
                                         className="min-w-[140px] bg-white p-3 rounded-2xl border border-gray-100 shadow-sm snap-start hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
                                         onClick={() => handleAddFromTemplate(template)}
                                     >
-                                        {/* Ekle Butonu (Sağ Üst) */}
                                         <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:opacity-100 transition-opacity">
                                             <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">+ Ekle</span>
                                         </div>
-
-                                        {/* YENİ: Pin Kaldırma Butonu (Sol Üst) */}
                                         <button 
                                             className="absolute top-0 left-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                                             onClick={(e) => {
-                                                e.stopPropagation(); // Kartın kendisine tıklanmasını (görev eklemesini) engeller
+                                                e.stopPropagation();
                                                 if(confirm("Bu şablonu sık kullanılanlardan kaldırmak istediğine emin misin?")) {
                                                     handlePinQuest(template.id);
                                                 }
@@ -290,7 +359,6 @@ export default function Dashboard() {
                                                 Kaldır
                                             </span>
                                         </button>
-
                                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-2" style={{backgroundColor: `${template.colorCode || '#3498db'}20`, color: template.colorCode || '#3498db'}}>
                                             {template.title.charAt(0).toUpperCase()}
                                         </div>
@@ -305,29 +373,31 @@ export default function Dashboard() {
                     )}
 
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <span>⚡</span> Bugünün Görevleri
+                        <span>⚡</span> {isToday ? "Bugünün Görevleri" : "Planlanan Görevler"}
                     </h2>
                     
-                    {/* GÖREV EKLEME FORMU */}
-                    <AddQuestForm onAdd={handleAddQuest} disabled={dashboardData?.isDayClosed} />
+                    {/* GÖREV EKLEME FORMU - Gelecek tarih için de çalışır */}
+                    <AddQuestForm onAdd={handleAddQuest} disabled={isToday && dashboardData?.isDayClosed} />
 
                     {/* GÖREV LİSTESİ */}
                     <div className="space-y-2 mt-4">
                         {(!dashboardData?.todayQuests || dashboardData.todayQuests.length === 0) ? (
                             <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300">
-                                <p>Henüz bugün için bir görevin yok.</p>
-                                <p className="text-sm">Hadi bir tane ekle ve günü kazan!</p>
+                                <p>{isToday ? "Henüz bugün için bir görevin yok." : "Bu tarih için planlanmış görev yok."}</p>
+                                <p className="text-sm">Hadi bir tane ekle!</p>
                             </div>
                         ) : (
                             dashboardData.todayQuests.map(quest => (
                                 <QuestItem 
                                     key={quest.id} 
                                     quest={quest} 
-                                    onToggle={handleToggleQuest}
+                                    onToggle={handleToggleQuest} 
                                     onDelete={handleDeleteQuest}
                                     onEdit={(q) => setEditingQuest(q)}
                                     onPin={handlePinQuest}
                                     isDayClosed={dashboardData?.isDayClosed}
+                                    // YENİ: Görsel olarak disabled olduğunu belirtmek için prop
+                                    disabled={isFuture} 
                                 />
                             ))
                         )}

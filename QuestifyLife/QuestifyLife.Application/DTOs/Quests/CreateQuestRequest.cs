@@ -14,7 +14,7 @@ public class CreateQuestRequest
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int RewardPoints { get; set; } = 10; // Kullanıcı belirleyebilir veya biz atarız
-    public DateTime ScheduledDate { get; set; } // Hangi gün yapılacak?
+    public DateTime? ScheduledDate { get; set; } // Hangi gün yapılacak?
     public string Category { get; set; } = "Genel";
     public string ColorCode { get; set; } = "#3498db";
 }

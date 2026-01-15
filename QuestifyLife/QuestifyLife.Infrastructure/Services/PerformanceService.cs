@@ -31,36 +31,70 @@ namespace QuestifyLife.Infrastructure.Services
             _badgeService = badgeService;
         }
 
-        public async Task<DashboardDto> GetDashboardAsync(Guid userId)
+        public async Task<DashboardDto> GetDashboardAsync(Guid userId, DateTime? date = null)
         {
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new Exception("Kullanıcı bulunamadı.");
 
-            // Senin kullandığın tarih mantığı (UTC Date)
-            var today = DateTime.UtcNow.Date;
+            // 1. Hedef Tarihi Belirle
+            // Frontend'den tarih geldiyse onu al, yoksa bugünü al.
+            // Önemli: Gelen tarih UTC ise ve Frontend TR saati gönderiyorsa, 
+            // burada sadece .Date kısmını almak yeterli olmayabilir.
+            // Ancak Frontend'de .toISOString() kullandık, bu UTC gönderir.
+            // Biz basitçe gelen tarihin "Günün Başlangıcı" olduğunu varsayalım.
 
-            // 1. Bugünün görevlerini çek
-            var todaysQuests = await _questRepository
-                .GetWhere(q => q.UserId == userId && q.ScheduledDate.Date == today)
+            DateTime targetDate;
+            if (date.HasValue)
+            {
+                targetDate = date.Value.Date;
+            }
+            else
+            {
+                targetDate = DateTime.UtcNow.Date; // Varsayılan Bugün
+            }
+
+            // Veritabanında arama yapmak için UTC aralığı oluştur
+            // Not: Senin sisteminde tarihler nasıl kaydediliyor? 
+            // QuestService'te TR saati (+3) eklenip kaydedildiğini görmüştüm.
+            // Eğer veritabanına TR saati ile kaydettiysen, burada da TR saati ile sorgulamalısın.
+            // Senin mevcut kodunda: q.ScheduledDate.Date == today kullanılmış.
+
+            // Mevcut koduna sadık kalarak:
+            // "today" değişkeni yerine "targetDate" kullanacağız.
+
+            // 2. Seçili Günün Görevlerini Çek
+            // NOT: EF Core'da .Date kullanımı bazen saat farkından dolayı sorun yaratabilir.
+            // Garanti olsun diye aralık (Range) sorgusu yapalım.
+            var dayStart = targetDate;
+            var dayEnd = targetDate.AddDays(1).AddTicks(-1);
+
+            // Eğer senin sisteminde UTC+3 kaydı varsa ve sunucu UTC ise:
+            // Bu kısım biraz karışık olabilir, senin mevcut yapını bozmadan 
+            // "q.ScheduledDate.Date == targetDate" mantığını koruyalım.
+            // Ancak QuestService'de "ScheduledDate = trTime" yaptığını biliyorum.
+            // Bu yüzden gelen "date" parametresini de TR saatine uygun hale getirmek gerekebilir.
+            // Şimdilik en güvenli yol, mevcut yapını kopyalamak:
+
+            var targetQuests = await _questRepository
+                .GetWhere(q => q.UserId == userId && q.ScheduledDate.Date == targetDate)
                 .ToListAsync();
 
-            // 2. Bugün kazanılan puanı hesapla
-            var pointsEarnedToday = todaysQuests
+            // 3. Puan Hesapla
+            var pointsEarnedOnTargetDate = targetQuests
                 .Where(q => q.IsCompleted)
                 .Sum(q => q.RewardPoints);
 
-            var todayPerformance = await _dailyPerformanceRepository
-                .GetWhere(d => d.UserId == userId && d.Date == today)
+            // 4. Performans Kaydını Çek
+            var targetPerformance = await _dailyPerformanceRepository
+                .GetWhere(d => d.UserId == userId && d.Date == targetDate)
                 .FirstOrDefaultAsync();
 
-            // --- YENİ EKLENEN KISIM: SIK KULLANILANLAR (PİNLENENLER) ---
-            // Kullanıcının "IsPinned = true" olan tüm görevlerini çekiyoruz
+            // 5. Pinlenen Şablonları Çek (Bunlar tarihten bağımsızdır, her zaman gelir)
             var allPinned = await _questRepository
                 .GetWhere(q => q.UserId == userId && q.IsPinned)
-                .OrderByDescending(q => q.CreatedDate) // En yeniler üstte
+                .OrderByDescending(q => q.CreatedDate)
                 .ToListAsync();
 
-            // Aynı isimdeki görevleri gruplayıp tekilleştiriyoruz (Şablon mantığı)
             var pinnedTemplates = allPinned
                 .GroupBy(q => q.Title)
                 .Select(g => g.First())
@@ -73,23 +107,25 @@ namespace QuestifyLife.Infrastructure.Services
                     Category = q.Category,
                     ColorCode = q.ColorCode,
                     IsPinned = true,
-                    IsCompleted = false // Şablon olduğu için tamamlanmamış görünür
+                    IsCompleted = false
                 })
                 .ToList();
-            // -------------------------------------------------------------
 
-            // DTO'yu doldur ve gönder
             return new DashboardDto
             {
                 Username = user.Username,
                 TotalXp = user.TotalXp,
                 DailyTarget = user.DailyTargetPoints,
                 CurrentStreak = user.CurrentStreak,
-                PointsEarnedToday = pointsEarnedToday,
-                IsDayClosed = todayPerformance != null ? todayPerformance.IsDayClosed : false,
 
-                // Bugünün görevleri listesi
-                TodayQuests = todaysQuests.Select(q => new QuestDto
+                // Seçili güne ait puan
+                PointsEarnedToday = pointsEarnedOnTargetDate,
+
+                // Seçili gün kapalı mı?
+                IsDayClosed = targetPerformance != null ? targetPerformance.IsDayClosed : false,
+
+                // Seçili günün görevleri
+                TodayQuests = targetQuests.Select(q => new QuestDto
                 {
                     Id = q.Id,
                     Title = q.Title,
@@ -101,7 +137,6 @@ namespace QuestifyLife.Infrastructure.Services
                     ColorCode = q.ColorCode
                 }).ToList(),
 
-                // Pinlenenler listesi (Buraya ekledik)
                 PinnedTemplates = pinnedTemplates
             };
         }

@@ -12,7 +12,7 @@ namespace QuestifyLife.Application.Interfaces
     public interface IPerformanceService
     {
         // Ana ekran verilerini getirir
-        Task<DashboardDto> GetDashboardAsync(Guid userId);
+        Task<DashboardDto> GetDashboardAsync(Guid userId, DateTime? date = null);
 
         // Günü kapatır, yapılmayanlardan ceza keser
         // GÜNCELLEME: Artık not parametresi de alıyor
@@ -21,5 +21,6 @@ namespace QuestifyLife.Application.Interfaces
         // YENİ: Takvim Verisi
         Task<List<CalendarDayDto>> GetCalendarDataAsync(Guid userId, int year, int month);
         Task<ServiceResponse<List<LeaderboardUserDto>>> GetLeaderboardAsync(Guid currentUserId);
+        //Task UpdateDailyPerformanceAsync(string userId);
     }
 }

@@ -20,11 +20,12 @@ namespace QuestifyLife.API.Controllers
             _performanceService = performanceService;
         }
 
-        [HttpGet("dashboard")] // {userId} kalktı
-        public async Task<IActionResult> GetDashboard()
+        [HttpGet("dashboard")]
+        public async Task<IActionResult> GetDashboard([FromQuery] DateTime? date) // Tarih parametresi eklendi
         {
             var userId = User.GetUserId();
-            return Ok(await _performanceService.GetDashboardAsync(userId));
+            // Tarihi servise iletiyoruz
+            return Ok(await _performanceService.GetDashboardAsync(userId, date));
         }
         public class FinishDayRequest { public string? Note { get; set; } }
 

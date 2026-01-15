@@ -34,10 +34,13 @@ namespace QuestifyLife.API.Controllers
         }
 
         [HttpGet("pending")]
-        public async Task<IActionResult> GetPending()
+        public async Task<IActionResult> GetPending([FromQuery] DateTime? date) // Tarih parametresi eklendi
         {
             var userId = User.GetUserId(); // Token'dan al
-            var quests = await _questService.GetPendingQuestsAsync(userId);
+
+            // Tarihi servise iletiyoruz
+            var quests = await _questService.GetPendingQuestsAsync(userId, date);
+
             return Ok(quests);
         }
         [HttpGet("pinned-templates")]
