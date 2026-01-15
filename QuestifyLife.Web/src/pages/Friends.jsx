@@ -12,7 +12,10 @@ export default function Friends() {
     // Veriler
     const [leaderboard, setLeaderboard] = useState([]);
     const [requests, setRequests] = useState([]);
-    const [emailToAdd, setEmailToAdd] = useState("");
+    
+    // GÜNCELLEME: İsim değişikliği (email -> usernameOrEmail)
+    const [inputToAdd, setInputToAdd] = useState(""); 
+    
     const [viewProfileId, setViewProfileId] = useState(null);
 
     useEffect(() => {
@@ -49,11 +52,22 @@ export default function Friends() {
     const sendFriendRequest = async (e) => {
         e.preventDefault();
         try {
-            await api.post('/Friends/send-request', { targetEmail: emailToAdd });
-            toast.success("İstek gönderildi!");
-            setEmailToAdd("");
+            // GÜNCELLEME: Backend'deki DTO'ya uygun parametre ismi
+            const payload = { usernameOrEmail: inputToAdd }; 
+            
+            const res = await api.post('/Friends/send-request', payload);
+            
+            // Backend'den dönen cevabı kontrol et
+            if (res.data.isSuccess) {
+                 toast.success(res.data.message || "İstek gönderildi!");
+            } else {
+                 toast.success(res.data.message || "İstek gönderildi!"); // Genelde başarılı döner, mesajı gösteririz
+            }
+            
+            setInputToAdd("");
         } catch (err) {
-            toast.error(err.response?.data?.message || "İstek gönderilemedi.");
+            const msg = err.response?.data?.message || "İstek gönderilemedi.";
+            toast.error(msg);
         }
     };
 
@@ -63,7 +77,7 @@ export default function Friends() {
             fetchRequests(); // Listeyi yenile
             toast.success(accept ? "Arkadaş eklendi!" : "İstek reddedildi.");
         } catch (err) {
-            console.error(err); // Hata değişkenini kullandık
+            console.error(err);
             toast.error("İşlem başarısız.");
         }
     };
@@ -74,7 +88,7 @@ export default function Friends() {
             await api.post(`/Friends/remove/${friendId}`);
             fetchLeaderboard();
         } catch (err) {
-            console.error(err); // Hata değişkenini kullandık
+            console.error(err);
             toast.error("Silinemedi.");
         }
     }
@@ -122,7 +136,10 @@ export default function Friends() {
                                 {/* Silme Butonu (Sadece arkadaşlar için, kendin için değil) */}
                                 {!friend.username.includes("(Sen)") && (
                                     <button 
-                                        onClick={() => removeFriend(friend.friendId)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeFriend(friend.friendId);
+                                        }}
                                         className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-2"
                                         title="Arkadaşlıktan Çıkar"
                                     >
@@ -136,22 +153,22 @@ export default function Friends() {
                 )}
 
                 {!loading && activeTab === 'add' && (
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center animate-fade-in-up">
                         <div className="text-5xl mb-4">🤝</div>
                         <h3 className="font-bold text-gray-800 mb-2">Arkadaşlarını Bul</h3>
-                        <p className="text-sm text-gray-500 mb-6">Onların email adresini girerek istek gönderebilirsin.</p>
+                        <p className="text-sm text-gray-500 mb-6">Kullanıcı adı veya e-posta adresi girerek arama yap.</p>
                         
                         <form onSubmit={sendFriendRequest}>
                             <input 
-                                type="email" 
-                                placeholder="arkadas@mail.com"
+                                type="text" // EMAIL DEĞİL TEXT YAPTIK
+                                placeholder="Kullanıcı Adı veya E-posta"
                                 className="w-full p-3 border rounded-lg mb-3 focus:outline-none focus:border-primary bg-gray-50"
-                                value={emailToAdd}
-                                onChange={(e) => setEmailToAdd(e.target.value)}
+                                value={inputToAdd}
+                                onChange={(e) => setInputToAdd(e.target.value)}
                                 required
                             />
-                            <button className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition">
-                                İstek Gönder
+                            <button className="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition shadow-lg shadow-blue-200">
+                                İstek Gönder 🚀
                             </button>
                         </form>
                     </div>
@@ -160,7 +177,7 @@ export default function Friends() {
                 {!loading && activeTab === 'requests' && (
                     <div className="space-y-3">
                         {requests.map(req => (
-                            <div key={req.requestId} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                            <div key={req.requestId} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center animate-fade-in">
                                 <div>
                                     <p className="font-bold text-gray-800">{req.senderUsername}</p>
                                     <p className="text-xs text-gray-400">Seni arkadaş olarak eklemek istiyor.</p>
@@ -168,13 +185,13 @@ export default function Friends() {
                                 <div className="flex gap-2">
                                     <button 
                                         onClick={() => respondToRequest(req.requestId, true)}
-                                        className="bg-green-100 text-green-600 p-2 rounded-full hover:bg-green-200"
+                                        className="bg-green-100 text-green-600 p-2 rounded-full hover:bg-green-200 transition"
                                     >
                                         ✅
                                     </button>
                                     <button 
                                         onClick={() => respondToRequest(req.requestId, false)}
-                                        className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200"
+                                        className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-200 transition"
                                     >
                                         ❌
                                     </button>

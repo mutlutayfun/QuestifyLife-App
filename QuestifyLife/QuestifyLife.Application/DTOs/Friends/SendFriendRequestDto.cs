@@ -9,7 +9,7 @@ namespace QuestifyLife.Application.DTOs.Friends
     public class SendFriendRequestDto
     {
         public Guid SenderId { get; set; }
-        public string TargetEmail { get; set; } = string.Empty; // Arkadaşın Emaili
+        public string UsernameOrEmail { get; set; } = string.Empty;
     }
 }
 

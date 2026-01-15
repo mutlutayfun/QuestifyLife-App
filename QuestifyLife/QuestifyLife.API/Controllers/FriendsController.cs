@@ -24,11 +24,37 @@ namespace QuestifyLife.API.Controllers
         public async Task<IActionResult> SendRequest([FromBody] SendFriendRequestDto request)
         {
             request.SenderId = User.GetUserId(); // Token'dan al
-            var result = await _friendService.SendRequestAsync(request);
-            return Ok(new { message = result });
+
+            try
+            {
+                var result = await _friendService.SendRequestAsync(request);
+                // Başarılıysa string dönüyor (Exception fırlatmazsa)
+                return Ok(new { message = result, isSuccess = true });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message, isSuccess = false });
+            }
         }
 
-        [HttpGet("pending-requests")] // ID parametresi kalktı
+        // --- YENİ ENDPOINT: ID ile İstek Gönder ---
+        [HttpPost("send-request/{targetUserId}")]
+        public async Task<IActionResult> SendRequestById(Guid targetUserId)
+        {
+            var userId = User.GetUserId();
+            try
+            {
+                var result = await _friendService.SendFriendRequestByIdAsync(userId, targetUserId);
+                return Ok(new { message = result, isSuccess = true });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message, isSuccess = false });
+            }
+        }
+        // ------------------------------------------
+
+        [HttpGet("pending-requests")]
         public async Task<IActionResult> GetPendingRequests()
         {
             var userId = User.GetUserId();
@@ -39,8 +65,6 @@ namespace QuestifyLife.API.Controllers
         [HttpPost("respond/{requestId}")]
         public async Task<IActionResult> Respond(Guid requestId, [FromQuery] bool accept)
         {
-            // Burada şimdilik userId kullanmıyoruz ama Authorize olduğu için 
-            // sadece giriş yapmış kullanıcılar çağırabilir.
             try
             {
                 var result = await _friendService.RespondToRequestAsync(requestId, accept);
@@ -52,15 +76,14 @@ namespace QuestifyLife.API.Controllers
             }
         }
 
-        [HttpGet("leaderboard")] // URL'den {userId} parametresini kaldırdık
+        [HttpGet("leaderboard")]
         public async Task<IActionResult> GetLeaderboard()
         {
-            var userId = User.GetUserId(); // Token'dan kimliği okuyoruz
+            var userId = User.GetUserId();
             var result = await _friendService.GetFriendsLeaderboardAsync(userId);
             return Ok(result);
         }
 
-        // YENİ: Arkadaş Silme Endpoint'i
         [HttpPost("remove/{friendId}")]
         public async Task<IActionResult> RemoveFriend(Guid friendId)
         {

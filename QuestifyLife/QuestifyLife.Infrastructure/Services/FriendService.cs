@@ -5,7 +5,6 @@ using QuestifyLife.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace QuestifyLife.Infrastructure.Services
@@ -23,15 +22,30 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<string> SendRequestAsync(SendFriendRequestDto request)
         {
-            // 1. Kendine istek atamazsın
             var sender = await _userRepository.GetByIdAsync(request.SenderId);
-            if (sender.Email == request.TargetEmail) throw new Exception("Kendine arkadaşlık isteği atamazsın.");
+            if (sender == null) throw new Exception("Gönderen kullanıcı bulunamadı.");
 
-            // 2. Hedef kullanıcı var mı?
-            var targetUser = await _userRepository.GetWhere(u => u.Email == request.TargetEmail).FirstOrDefaultAsync();
-            if (targetUser == null) throw new Exception("Bu email adresine sahip bir kullanıcı bulunamadı.");
+            User? targetUser = null;
 
-            // 3. Zaten istek var mı veya arkadaşlar mı?
+            // 1. Gelen veri bir GUID (User ID) mi?
+            if (Guid.TryParse(request.UsernameOrEmail, out Guid targetGuid))
+            {
+                targetUser = await _userRepository.GetByIdAsync(targetGuid);
+            }
+            else
+            {
+                // 2. Değilse: Kullanıcı Adı veya Email olarak ara
+                targetUser = await _userRepository.GetWhere(u =>
+                    u.Email == request.UsernameOrEmail ||
+                    u.Username == request.UsernameOrEmail
+                ).FirstOrDefaultAsync();
+            }
+
+            // KONTROLLER
+            if (targetUser == null) throw new Exception("Kullanıcı bulunamadı.");
+            if (sender.Id == targetUser.Id) throw new Exception("Kendine arkadaşlık isteği atamazsın.");
+
+            // 3. Zaten ilişki var mı?
             var existing = await _friendshipRepository.GetWhere(f =>
                 (f.RequesterId == request.SenderId && f.AddresseeId == targetUser.Id) ||
                 (f.RequesterId == targetUser.Id && f.AddresseeId == request.SenderId))
@@ -39,7 +53,11 @@ namespace QuestifyLife.Infrastructure.Services
 
             if (existing != null)
             {
-                if (existing.Status == FriendshipStatus.Pending) return "Zaten bekleyen bir istek var.";
+                if (existing.Status == FriendshipStatus.Pending)
+                {
+                    if (existing.RequesterId == request.SenderId) return "Zaten bekleyen bir istek var.";
+                    else return "Bu kullanıcı sana zaten istek göndermiş. İstekler sekmesine bak!";
+                }
                 if (existing.Status == FriendshipStatus.Accepted) return "Zaten arkadaşsınız.";
             }
 
@@ -48,7 +66,42 @@ namespace QuestifyLife.Infrastructure.Services
             {
                 RequesterId = request.SenderId,
                 AddresseeId = targetUser.Id,
-                Status = FriendshipStatus.Pending
+                Status = FriendshipStatus.Pending,
+                CreatedDate = DateTime.UtcNow
+            };
+
+            await _friendshipRepository.AddAsync(newFriendship);
+            await _friendshipRepository.SaveAsync();
+
+            return "Arkadaşlık isteği gönderildi!";
+        }
+
+        // --- DİĞER METOTLAR AYNI KALDI ---
+
+        public async Task<string> SendFriendRequestByIdAsync(Guid requesterId, Guid targetUserId)
+        {
+            if (requesterId == targetUserId) throw new Exception("Kendine istek gönderemezsin.");
+
+            var targetUser = await _userRepository.GetByIdAsync(targetUserId);
+            if (targetUser == null) throw new Exception("Kullanıcı bulunamadı.");
+
+            var existing = await _friendshipRepository.GetWhere(f =>
+                (f.RequesterId == requesterId && f.AddresseeId == targetUserId) ||
+                (f.RequesterId == targetUserId && f.AddresseeId == requesterId)
+            ).FirstOrDefaultAsync();
+
+            if (existing != null)
+            {
+                if (existing.Status == FriendshipStatus.Pending) return "Zaten bekleyen bir istek var.";
+                if (existing.Status == FriendshipStatus.Accepted) return "Zaten arkadaşsınız.";
+            }
+
+            var newFriendship = new Friendship
+            {
+                RequesterId = requesterId,
+                AddresseeId = targetUserId,
+                Status = FriendshipStatus.Pending,
+                CreatedDate = DateTime.UtcNow
             };
 
             await _friendshipRepository.AddAsync(newFriendship);
@@ -71,7 +124,6 @@ namespace QuestifyLife.Infrastructure.Services
             }
             else
             {
-                // Reddedilirse kaydı silebiliriz, böylece tekrar istek atılabilir.
                 await _friendshipRepository.RemoveAsync(requestId);
                 await _friendshipRepository.SaveAsync();
                 return "İstek reddedildi.";
@@ -80,7 +132,6 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<List<FriendRequestListDto>> GetPendingRequestsAsync(Guid userId)
         {
-            // Bana (AddresseeId == userId) gelen ve durumu Pending olanları bul
             var requests = await _friendshipRepository
                 .GetWhere(f => f.AddresseeId == userId && f.Status == FriendshipStatus.Pending)
                 .Include(f => f.Requester)
@@ -97,7 +148,6 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<List<FriendDto>> GetFriendsLeaderboardAsync(Guid userId)
         {
-            // İki taraflı sorgu: Ben eklemiş olabilirim YA DA o beni eklemiş olabilir.
             var friendships = await _friendshipRepository
                 .GetWhere(f => (f.RequesterId == userId || f.AddresseeId == userId) && f.Status == FriendshipStatus.Accepted)
                 .Include(f => f.Requester)
@@ -108,19 +158,7 @@ namespace QuestifyLife.Infrastructure.Services
 
             foreach (var f in friendships)
             {
-                // İlişkinin diğer tarafını buluyoruz
-                User friendUser;
-                if (f.RequesterId == userId)
-                {
-                    // İstek atan benim, arkadaşım "Addressee"
-                    friendUser = f.Addressee;
-                }
-                else
-                {
-                    // İstek alan benim, arkadaşım "Requester" (Beni ekleyen kişi)
-                    friendUser = f.Requester;
-                }
-
+                User friendUser = (f.RequesterId == userId) ? f.Addressee : f.Requester;
                 friendList.Add(new FriendDto
                 {
                     FriendId = friendUser.Id,
@@ -129,7 +167,6 @@ namespace QuestifyLife.Infrastructure.Services
                 });
             }
 
-            // Listeye kendimizi de ekleyelim
             var me = await _userRepository.GetByIdAsync(userId);
             if (me != null)
             {
@@ -141,7 +178,6 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<bool> RemoveFriendAsync(Guid userId, Guid friendId)
         {
-            // Arkadaşlık kaydını bul (Yön fark etmeksizin)
             var friendship = await _friendshipRepository.GetWhere(f =>
                 (f.RequesterId == userId && f.AddresseeId == friendId) ||
                 (f.RequesterId == friendId && f.AddresseeId == userId)
@@ -149,7 +185,6 @@ namespace QuestifyLife.Infrastructure.Services
 
             if (friendship == null) return false;
 
-            // Kaydı veritabanından sil
             _friendshipRepository.Remove(friendship);
             await _friendshipRepository.SaveAsync();
 

@@ -10,6 +10,8 @@ namespace QuestifyLife.Application.Interfaces
     public interface IFriendService
     {
         Task<string> SendRequestAsync(SendFriendRequestDto request);
+
+        Task<string> SendFriendRequestByIdAsync(Guid requesterId, Guid targetUserId);
         Task<string> RespondToRequestAsync(Guid requestId, bool isAccepted); // Cevap ver
         Task<List<FriendRequestListDto>> GetPendingRequestsAsync(Guid userId); // Bekleyenleri gör
         Task<List<FriendDto>> GetFriendsLeaderboardAsync(Guid userId); // Arkadaşları listele
