@@ -12,15 +12,27 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-// ... existing code ...
 
-// 1. Veritabanı Bağlantısını Ekliyoruz
-// appsettings.json'dan "DefaultConnection" bilgisini okur ve DbContext'e verir.
+// --- 1. VERİTABANI BAĞLANTISI ---
 builder.Services.AddDbContext<QuestifyLifeDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// REPOSITORY SERVİS KAYDI
-// Scoped: Her HTTP isteği (Request) için yeni bir nesne oluşturur.
+// --- 2. CORS AYARLARI (GÜVENLİK GÜNCELLEMESİ) ---
+// Frontend'in çalışacağı adresleri appsettings.json'dan alıyoruz.
+// Eğer ayar yoksa varsayılan olarak tümüne izin verir (Geliştirme sırasındaki hatayı önlemek için)
+var allowedOrigins = builder.Configuration.GetValue<string>("AllowedOrigins")?.Split(",") ?? new string[] { "*" };
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CustomCorsPolicy", policy =>
+    {
+        policy.WithOrigins(allowedOrigins) // Sadece izin verilen adresler
+              .AllowAnyHeader()            // Her türlü başlığa izin ver
+              .AllowAnyMethod();           // GET, POST, PUT, DELETE vb. izin ver
+    });
+});
+
+// --- 3. SERVİSLERİN ENJEKTE EDİLMESİ (IoC Container) ---
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -30,8 +42,8 @@ builder.Services.AddScoped<IFriendService, FriendService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBadgeService, BadgeService>();
-// ... existing code ...
-// Add services to the container.
+
+// --- 4. JWT AUTHENTICATION AYARLARI ---
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]);
 
@@ -56,25 +68,12 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddControllers();
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll",
-        builder =>
-        {
-            builder
-            .AllowAnyOrigin()   // Her yerden gelen isteği kabul et (Canlıya geçince kısıtlayacağız)
-            .AllowAnyMethod()   // GET, POST, PUT, DELETE hepsine izin ver
-            .AllowAnyHeader();  // Token header'larına izin ver
-        });
-});
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// --- 5. SWAGGER (API Dokümantasyonu) ---
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "QuestifyLife API", Version = "v1" });
 
-    // 1. Güvenlik Tanımı (Security Definition)
-    // Swagger'a "Bearer" tipinde bir token kullanılacağını anlatıyoruz.
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -85,8 +84,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "JWT Authorization header using the Bearer scheme. \r\n\r\n Enter 'Bearer' [space] and then your token in the text input below.\r\n\r\nExample: \"Bearer 12345abcdef\""
     });
 
-    // 2. Güvenlik Gereksinimi (Security Requirement)
-    // Tüm endpoint'lerde bu kilidin aktif olabileceğini belirtiyoruz.
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -103,31 +100,36 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// FluentValidation'ı sisteme tanıtıyoruz
-builder.Services.AddFluentValidationAutoValidation(); // Otomatik validasyon açar
-builder.Services.AddFluentValidationClientsideAdapters(); // Client tarafı için
-
-// Validator'ların olduğu Assembly'i (Application katmanını) tarayıp bulmasını söylüyoruz.
-// RegisterRequestValidator sınıfının olduğu projedeki tüm validatorları kaydeder.
+// FluentValidation Ayarları
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddFluentValidationClientsideAdapters();
 builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// --- 6. MIDDLEWARE PIPELINE ---
+
+// Global Hata Yakalayıcı (En üstte olmalı)
+app.UseMiddleware<QuestifyLife.API.Middlewares.GlobalExceptionMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    // Canlı ortamda HTTP isteklerini HTTPS'e zorla (Güvenlik için kritik)
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 
-app.UseMiddleware<QuestifyLife.API.Middlewares.GlobalExceptionMiddleware>();
-
-app.UseCors("AllowAll");
+// CORS Middleware'i (Authentication'dan ÖNCE olmalı)
+// "AllowAll" yerine yeni güvenli politikamızı kullanıyoruz.
+app.UseCors("CustomCorsPolicy");
 
 app.UseAuthentication();
-
 app.UseAuthorization();
 
 app.MapControllers();
