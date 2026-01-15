@@ -18,6 +18,7 @@ namespace QuestifyLife.Application.DTOs.Performance
 
         // Ana ekranda bugünün görevlerini de göstermek isteriz
         public List<QuestDto> TodayQuests { get; set; } = new List<QuestDto>();
+        public List<QuestDto> PinnedTemplates { get; set; }
     }
 }
 

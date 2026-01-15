@@ -77,4 +77,3 @@ const QuestItem = ({ quest, onToggle, onDelete, onEdit, onPin, isDayClosed }) =>
 };
 
 export default QuestItem;
-

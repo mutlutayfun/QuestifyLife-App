@@ -44,16 +44,13 @@ namespace QuestifyLife.Infrastructure.Services
             if (request.RewardPoints <= 0) throw new Exception("Puan 0'dan büyük olmalıdır.");
 
             // --- TÜRKİYE SAATİ AYARI (UTC+3) ---
-            // Sunucu saati UTC olsa bile biz +3 ekleyerek TR saatine zorluyoruz.
             var trTime = DateTime.UtcNow.AddHours(3);
             var todayTr = trTime.Date;
 
-            // Veritabanı sorgusu için UTC aralıklarını hesapla
-            // TR'de gün 00:00'da başlar -> Bu UTC'de önceki gün 21:00 demektir.
             var todayStartUtc = todayTr.AddHours(-3);
             var todayEndUtc = todayTr.AddDays(1).AddHours(-3).AddTicks(-1);
 
-            // Gün kapalılık kontrolü (Hesaplanan UTC aralığı ile)
+            // GÜN KAPALI MI KONTROL ET
             var isDayClosed = await _dailyPerformanceRepository.GetWhere(d =>
                 d.UserId == request.UserId &&
                 d.Date >= todayStartUtc && d.Date <= todayEndUtc &&
@@ -68,12 +65,12 @@ namespace QuestifyLife.Infrastructure.Services
                 Title = request.Title,
                 Description = request.Description,
                 RewardPoints = request.RewardPoints,
-                ScheduledDate = request.ScheduledDate,
+                ScheduledDate = trTime, // TR Saatiyle kaydet
                 IsCompleted = false,
                 CompletedDate = null,
                 Category = request.Category ?? "Genel",
                 ColorCode = request.ColorCode ?? "#3498db",
-                IsPinned = false
+                IsPinned = false // Yeni eklenen görev varsayılan olarak pinli değil
             };
 
             await _questRepository.AddAsync(newQuest);
@@ -82,30 +79,26 @@ namespace QuestifyLife.Infrastructure.Services
             return newQuest;
         }
 
-        // --- GÜNCELLENMİŞ METOT: TÜRKİYE SAATİNE DÖNÜŞ ---
+        // --- GÜNCEL GÖREVLER (Sadece Bugünü Getir) ---
         public async Task<List<QuestDto>> GetPendingQuestsAsync(Guid userId)
         {
             // 1. ZAMAN AYARLAMASI (TRT - UTC+3)
             var trTime = DateTime.UtcNow.AddHours(3);
+            var todayTr = trTime.Date;
+            var yesterdayTr = todayTr.AddDays(-1);
 
-            var todayTr = trTime.Date; // TR Saatiyle Bugün 00:00
-            var yesterdayTr = todayTr.AddDays(-1); // TR Saatiyle Dün 00:00
-
-            // UTC Aralık Hesaplama
             var todayStartUtc = todayTr.AddHours(-3);
             var todayEndUtc = todayTr.AddDays(1).AddHours(-3).AddTicks(-1);
-
             var yesterdayStartUtc = yesterdayTr.AddHours(-3);
             var yesterdayEndUtc = yesterdayTr.AddDays(1).AddHours(-3).AddTicks(-1);
 
-            // 2. CEZA KONTROLÜ (DÜNÜN PERFORMANSI)
+            // 2. CEZA KONTROLÜ (Dün kapatılmadıysa kapat)
             var yesterdayPerformance = await _dailyPerformanceRepository
                 .GetWhere(d => d.UserId == userId && d.Date >= yesterdayStartUtc && d.Date <= yesterdayEndUtc)
                 .FirstOrDefaultAsync();
 
             if (yesterdayPerformance != null && !yesterdayPerformance.IsDayClosed)
             {
-                // Günü zorla kapat ve ceza ver
                 yesterdayPerformance.IsDayClosed = true;
                 _dailyPerformanceRepository.Update(yesterdayPerformance);
 
@@ -119,58 +112,7 @@ namespace QuestifyLife.Infrastructure.Services
                 await _userRepository.SaveAsync();
             }
 
-            // 3. BUGÜNÜN KONTROLÜ (PİNLEME İÇİN)
-            var isTodayClosed = await _dailyPerformanceRepository
-                .GetWhere(d => d.UserId == userId && d.Date >= todayStartUtc && d.Date <= todayEndUtc && d.IsDayClosed)
-                .AnyAsync();
-
-            if (!isTodayClosed)
-            {
-                // Pinli şablonları getir
-                var allPinnedQuests = await _questRepository
-                    .GetWhere(q => q.UserId == userId && q.IsPinned)
-                    .OrderByDescending(q => q.ScheduledDate)
-                    .ToListAsync();
-
-                var uniquePinnedTemplates = allPinnedQuests
-                    .GroupBy(q => q.Title)
-                    .Select(g => g.First())
-                    .ToList();
-
-                bool changesMade = false;
-
-                foreach (var template in uniquePinnedTemplates)
-                {
-                    // Bugün için bu görev var mı? (UTC aralık kontrolü ile)
-                    var existsToday = await _questRepository
-                        .GetWhere(q => q.UserId == userId && q.Title == template.Title &&
-                                       q.ScheduledDate >= todayStartUtc && q.ScheduledDate <= todayEndUtc)
-                        .AnyAsync();
-
-                    if (!existsToday)
-                    {
-                        var dailyClone = new Quest
-                        {
-                            UserId = userId,
-                            Title = template.Title,
-                            Description = template.Description,
-                            RewardPoints = template.RewardPoints,
-                            Category = template.Category,
-                            ColorCode = template.ColorCode,
-                            IsPinned = true,
-                            IsCompleted = false,
-                            // Görevi oluştururken TR saatine uygun UTC zamanı veriyoruz
-                            ScheduledDate = todayStartUtc.AddHours(12), // Öğlen 12 UTC (Güvenli)
-                            CompletedDate = null
-                        };
-                        await _questRepository.AddAsync(dailyClone);
-                        changesMade = true;
-                    }
-                }
-                if (changesMade) await _questRepository.SaveAsync();
-            }
-
-            // 4. LİSTELEME (Sadece BUGÜNE ait ve yapılmamış görevler)
+            // 3. LİSTELEME (Sadece BUGÜNE ait aktif görevler)
             return await _questRepository
                 .GetWhere(q => q.UserId == userId && !q.IsCompleted &&
                                q.ScheduledDate >= todayStartUtc && q.ScheduledDate <= todayEndUtc)
@@ -181,9 +123,39 @@ namespace QuestifyLife.Infrastructure.Services
                     Description = q.Description,
                     RewardPoints = q.RewardPoints,
                     IsCompleted = q.IsCompleted,
-                    IsPinned = q.IsPinned
+                    IsPinned = q.IsPinned,
+                    ColorCode = q.ColorCode,
+                    Category = q.Category
                 })
                 .ToListAsync();
+        }
+
+        // --- YENİ: PİNLENENLERİ (ŞABLONLARI) GETİR ---
+        public async Task<List<QuestDto>> GetPinnedTemplatesAsync(Guid userId)
+        {
+            // Kullanıcının tüm pinli görevlerini çek
+            var allPinned = await _questRepository
+                .GetWhere(q => q.UserId == userId && q.IsPinned)
+                .OrderByDescending(q => q.CreatedDate)
+                .ToListAsync();
+
+            // Bellekte gruplama yaparak aynı isimdeki görevlerden sadece en sonuncusunu al (Tekrarı önle)
+            var uniqueTemplates = allPinned
+                .GroupBy(q => q.Title)
+                .Select(g => g.First())
+                .Select(q => new QuestDto
+                {
+                    Id = q.Id, // Referans ID
+                    Title = q.Title,
+                    Description = q.Description,
+                    RewardPoints = q.RewardPoints,
+                    Category = q.Category,
+                    ColorCode = q.ColorCode,
+                    IsPinned = true
+                })
+                .ToList();
+
+            return uniqueTemplates;
         }
 
         public async Task<bool> TogglePinStatusAsync(Guid questId, Guid userId)
@@ -191,6 +163,7 @@ namespace QuestifyLife.Infrastructure.Services
             var quest = await _questRepository.GetByIdAsync(questId);
             if (quest == null || quest.UserId != userId) return false;
 
+            // Pin durumunu değiştir (Bu artık "Şablonlara Ekle/Çıkar" işlevi görüyor)
             quest.IsPinned = !quest.IsPinned;
 
             _questRepository.Update(quest);
@@ -209,13 +182,11 @@ namespace QuestifyLife.Infrastructure.Services
             var trTime = DateTime.UtcNow.AddHours(3);
             var todayTr = trTime.Date;
 
-            // UTC Aralıkları
             var todayStartUtc = todayTr.AddHours(-3);
             var todayEndUtc = todayTr.AddDays(1).AddHours(-3).AddTicks(-1);
 
             var user = await _userRepository.GetByIdAsync(userId);
 
-            // Bugünün performans kaydını bul
             var todayPerformance = await _dailyPerformanceRepository
                 .GetWhere(p => p.UserId == userId && p.Date >= todayStartUtc && p.Date <= todayEndUtc)
                 .FirstOrDefaultAsync();
@@ -247,7 +218,7 @@ namespace QuestifyLife.Infrastructure.Services
             {
                 // CHECK
                 quest.IsCompleted = true;
-                quest.CompletedDate = DateTime.UtcNow;
+                quest.CompletedDate = trTime;
 
                 if (user != null) user.TotalXp += quest.RewardPoints;
 
@@ -256,8 +227,8 @@ namespace QuestifyLife.Infrastructure.Services
                     todayPerformance = new DailyPerformance
                     {
                         UserId = userId,
-                        // Kayıt tarihi olarak UTC kullanıyoruz
-                        Date = DateTime.UtcNow,
+                        // Kayıt tarihini de TR Saati olarak atıyoruz
+                        Date = trTime,
                         TotalPointsEarned = quest.RewardPoints
                     };
                     await _dailyPerformanceRepository.AddAsync(todayPerformance);
@@ -289,7 +260,6 @@ namespace QuestifyLife.Infrastructure.Services
             if (quest == null || quest.UserId != request.UserId) return false;
             if (request.RewardPoints > MAX_QUEST_POINTS) return false;
 
-            // Zaman kontrolü (TRT)
             var trTime = DateTime.UtcNow.AddHours(3);
             var todayTr = trTime.Date;
             var todayStartUtc = todayTr.AddHours(-3);
@@ -318,7 +288,6 @@ namespace QuestifyLife.Infrastructure.Services
             var quest = await _questRepository.GetByIdAsync(questId);
             if (quest == null || quest.UserId != userId) return false;
 
-            // Zaman kontrolü (TRT)
             var trTime = DateTime.UtcNow.AddHours(3);
             var todayTr = trTime.Date;
             var todayStartUtc = todayTr.AddHours(-3);

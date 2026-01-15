@@ -14,4 +14,6 @@ public class QuestDto
     public int RewardPoints { get; set; }
     public bool IsCompleted { get; set; }
     public bool IsPinned { get; set; }
+    public string ColorCode { get; set; }
+    public string Category { get; set; }
 }

@@ -4,26 +4,27 @@ const EditQuestModal = ({ isOpen, onClose, onUpdate, quest }) => {
     const [formData, setFormData] = useState({
         title: "",
         description: "",
-        points: 10,
+        rewardPoints: 10,
         category: ""
     });
 
     useEffect(() => {
         if (quest) {
             setFormData({
-                title: quest.title,
+                title: quest.title || "",
                 description: quest.description || "",
-                points: quest.rewardPoints,
+                rewardPoints: quest.rewardPoints || quest.points || 10,
                 category: quest.category || "Diğer"
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [quest]); // Sadece quest değiştiğinde çalışsın yeterli
+    }, [quest]); 
 
     if (!isOpen) return null;
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        // Form verilerini üst bileşene gönderirken orijinal quest verilerini koruyoruz
         onUpdate({ ...quest, ...formData }); 
         onClose();
     };
@@ -58,14 +59,16 @@ const EditQuestModal = ({ isOpen, onClose, onUpdate, quest }) => {
                         <div className="flex-1">
                             <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Puan</label>
                             <select 
-                                value={formData.points} 
-                                onChange={e => setFormData({...formData, points: parseInt(e.target.value)})}
+                                value={formData.rewardPoints} 
+                                onChange={e => setFormData({...formData, rewardPoints: parseInt(e.target.value)})}
                                 className="w-full p-2 border rounded-lg bg-gray-50 text-sm"
                             >
+                                <option value="5">5 XP</option>
                                 <option value="10">10 XP</option>
+                                <option value="15">15 XP</option>
                                 <option value="20">20 XP</option>
-                                <option value="50">50 XP</option>
-                                <option value="100">100 XP</option>
+                                <option value="25">25 XP</option>
+                                <option value="30">30 XP</option>
                             </select>
                         </div>
                         <div className="flex-1">

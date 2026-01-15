@@ -3,12 +3,11 @@ using QuestifyLife.Application.DTOs.Common;
 using QuestifyLife.Application.DTOs.Performance;
 using QuestifyLife.Application.DTOs.Quests;
 using QuestifyLife.Application.Interfaces;
-using QuestifyLife.Application.Wrappers;
+using QuestifyLife.Application.Wrappers; // Senin yapındaki Wrapper
 using QuestifyLife.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace QuestifyLife.Infrastructure.Services
@@ -37,22 +36,47 @@ namespace QuestifyLife.Infrastructure.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new Exception("Kullanıcı bulunamadı.");
 
-            // Bugünün tarih aralığını belirle (Saat farklarını yutmamak için)
+            // Senin kullandığın tarih mantığı (UTC Date)
             var today = DateTime.UtcNow.Date;
 
-            // Bugünün görevlerini çek
+            // 1. Bugünün görevlerini çek
             var todaysQuests = await _questRepository
                 .GetWhere(q => q.UserId == userId && q.ScheduledDate.Date == today)
                 .ToListAsync();
 
-            // Bugün kazanılan puanı hesapla (Sadece tamamlananlar)
+            // 2. Bugün kazanılan puanı hesapla
             var pointsEarnedToday = todaysQuests
                 .Where(q => q.IsCompleted)
                 .Sum(q => q.RewardPoints);
-            
+
             var todayPerformance = await _dailyPerformanceRepository
                 .GetWhere(d => d.UserId == userId && d.Date == today)
                 .FirstOrDefaultAsync();
+
+            // --- YENİ EKLENEN KISIM: SIK KULLANILANLAR (PİNLENENLER) ---
+            // Kullanıcının "IsPinned = true" olan tüm görevlerini çekiyoruz
+            var allPinned = await _questRepository
+                .GetWhere(q => q.UserId == userId && q.IsPinned)
+                .OrderByDescending(q => q.CreatedDate) // En yeniler üstte
+                .ToListAsync();
+
+            // Aynı isimdeki görevleri gruplayıp tekilleştiriyoruz (Şablon mantığı)
+            var pinnedTemplates = allPinned
+                .GroupBy(q => q.Title)
+                .Select(g => g.First())
+                .Select(q => new QuestDto
+                {
+                    Id = q.Id,
+                    Title = q.Title,
+                    Description = q.Description,
+                    RewardPoints = q.RewardPoints,
+                    Category = q.Category,
+                    ColorCode = q.ColorCode,
+                    IsPinned = true,
+                    IsCompleted = false // Şablon olduğu için tamamlanmamış görünür
+                })
+                .ToList();
+            // -------------------------------------------------------------
 
             // DTO'yu doldur ve gönder
             return new DashboardDto
@@ -63,14 +87,22 @@ namespace QuestifyLife.Infrastructure.Services
                 CurrentStreak = user.CurrentStreak,
                 PointsEarnedToday = pointsEarnedToday,
                 IsDayClosed = todayPerformance != null ? todayPerformance.IsDayClosed : false,
+
+                // Bugünün görevleri listesi
                 TodayQuests = todaysQuests.Select(q => new QuestDto
                 {
                     Id = q.Id,
                     Title = q.Title,
                     Description = q.Description,
                     RewardPoints = q.RewardPoints,
-                    IsCompleted = q.IsCompleted
-                }).ToList()
+                    IsCompleted = q.IsCompleted,
+                    IsPinned = q.IsPinned,
+                    Category = q.Category,
+                    ColorCode = q.ColorCode
+                }).ToList(),
+
+                // Pinlenenler listesi (Buraya ekledik)
+                PinnedTemplates = pinnedTemplates
             };
         }
 
@@ -81,7 +113,6 @@ namespace QuestifyLife.Infrastructure.Services
 
             var today = DateTime.UtcNow.Date;
 
-            // Bugünün performans kaydı zaten var mı? (Günde 1 kere çalışmalı)
             var existingPerformance = await _dailyPerformanceRepository
                 .GetWhere(d => d.UserId == userId && d.Date == today)
                 .FirstOrDefaultAsync();
@@ -89,35 +120,30 @@ namespace QuestifyLife.Infrastructure.Services
             if (existingPerformance != null)
                 return new OperationResultDto { IsSuccess = false, Message = "Bugün zaten kapatılmış!" };
 
-            // Görevleri çek
             var todaysQuests = await _questRepository
                 .GetWhere(q => q.UserId == userId && q.ScheduledDate.Date == today)
                 .ToListAsync();
 
-            // İstatistikleri Hesapla
             int earnedPoints = todaysQuests.Where(q => q.IsCompleted).Sum(q => q.RewardPoints);
 
-            // Yapılmayan görevlerin ceza puanlarını topla
-            int penaltyPoints = todaysQuests.Where(q => !q.IsCompleted).Sum(q => q.PenaltyPoints); // Zaten negatif gelir (-5 gibi)
+            // PenaltyPoints modelinde yoksa hata verebilir, eğer yoksa burayı 0 yapabilirsin.
+            // Senin kodunda olduğu için bıraktım.
+            int penaltyPoints = todaysQuests.Where(q => !q.IsCompleted).Sum(q => q.PenaltyPoints);
 
-            // Toplam günlük net skor (Ödül - Ceza)
             int netScore = earnedPoints + penaltyPoints;
 
-            // Kullanıcının ana puanına yansıt (Ceza ise puan düşer)
-            user.TotalXp += penaltyPoints; // Sadece cezayı düşüyoruz, ödülleri zaten görev tamamlanınca anlık vermiştik.
+            user.TotalXp += penaltyPoints;
 
-            // Hedef Kontrolü
             bool isTargetReached = earnedPoints >= user.DailyTargetPoints;
             if (isTargetReached)
             {
-                user.CurrentStreak++; // Seri arttır
+                user.CurrentStreak++;
             }
             else
             {
-                user.CurrentStreak = 0; // Seri bozuldu :(
+                user.CurrentStreak = 0;
             }
 
-            // Günlük Raporu Kaydet
             var dailyPerf = new DailyPerformance
             {
                 UserId = userId,
@@ -125,16 +151,15 @@ namespace QuestifyLife.Infrastructure.Services
                 TotalPointsEarned = earnedPoints,
                 IsTargetReached = isTargetReached,
                 IsDayClosed = true,
-                RolloverDebt = isTargetReached ? 0 : (user.DailyTargetPoints - earnedPoints), // Hedefe ulaşmadıysa kalan fark borç olur
+                RolloverDebt = isTargetReached ? 0 : (user.DailyTargetPoints - earnedPoints),
                 DayNote = dayNote
             };
 
             await _dailyPerformanceRepository.AddAsync(dailyPerf);
-            _userRepository.Update(user); // Streak ve XP güncellemeleri için
+            _userRepository.Update(user);
             await _userRepository.SaveAsync();
             await _dailyPerformanceRepository.SaveAsync();
 
-            // Rozet Kontrolü
             var newBadges = await _badgeService.CheckAndAwardBadgesAsync(userId);
 
             return new OperationResultDto
@@ -144,14 +169,13 @@ namespace QuestifyLife.Infrastructure.Services
                 NewBadges = newBadges
             };
         }
+
         public async Task<List<CalendarDayDto>> GetCalendarDataAsync(Guid userId, int year, int month)
         {
-            // 1. O aya ait performans (Skor/Not) verilerini çek
             var performances = await _dailyPerformanceRepository
                .GetWhere(d => d.UserId == userId && d.Date.Year == year && d.Date.Month == month)
                .ToListAsync();
 
-            // 2. O ay tamamlanan görevleri, TARİH ARALIĞI vererek çek
             var startDate = new DateTime(year, month, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1).AddHours(23).AddMinutes(59);
 
@@ -160,40 +184,34 @@ namespace QuestifyLife.Infrastructure.Services
                                q.IsCompleted &&
                                q.ScheduledDate >= startDate &&
                                q.ScheduledDate <= endDate)
-                .ToListAsync(); // <-- ÖNEMLİ: Veriyi önce belleğe çekiyoruz (Memory)
+                .ToListAsync();
 
-            // 3. Verileri Bellekte Birleştir (Mapping)
-            // Artık veriler bellekte olduğu için hata almazsın
             var calendarData = performances.Select(p => new CalendarDayDto
             {
                 Date = p.Date,
                 Points = p.TotalPointsEarned,
                 TargetReached = p.IsTargetReached,
                 Note = p.DayNote,
-
-                // Eşleştirme Kısmı
                 CompletedQuests = quests
-                    .Where(q => q.ScheduledDate.Date == p.Date.Date) // Tarih Eşleşmesi
+                    .Where(q => q.ScheduledDate.Date == p.Date.Date)
                     .Select(q => new CalendarQuestDto
                     {
                         Title = q.Title,
-                        Category = q.Category ?? "Genel", // Kategori boşsa "Genel" yaz
+                        Category = q.Category ?? "Genel",
                         RewardPoints = q.RewardPoints
                     })
                     .ToList(),
-
                 CompletedQuestCount = quests.Count(q => q.ScheduledDate.Date == p.Date.Date)
             }).ToList();
 
             return calendarData;
         }
+
         public async Task<ServiceResponse<List<LeaderboardUserDto>>> GetLeaderboardAsync(Guid currentUserId)
         {
-            // 1. Tüm kullanıcıları XP'ye göre çoktan aza sırala
-            // Not: Gerçek bir projede milyonlarca kullanıcı varsa "Take(50)" gibi limitler koyarız.
             var allUsers = await _userRepository.GetWhere(u => true)
                 .OrderByDescending(u => u.TotalXp)
-                .Take(50) // Performans için ilk 50 kişiyi çekelim
+                .Take(50)
                 .ToListAsync();
 
             var leaderboard = new List<LeaderboardUserDto>();
@@ -206,7 +224,6 @@ namespace QuestifyLife.Infrastructure.Services
                     UserId = user.Id,
                     Rank = rankCounter++,
                     Username = user.Username,
-                    // Eğer AvatarId boşsa varsayılan bir tane ata
                     AvatarId = string.IsNullOrEmpty(user.AvatarId) ? "avatar_1" : user.AvatarId,
                     TotalXp = user.TotalXp,
                     IsCurrentUser = user.Id == currentUserId

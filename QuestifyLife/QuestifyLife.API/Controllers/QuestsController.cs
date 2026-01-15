@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using QuestifyLife.API.Extensions;
 using QuestifyLife.Application.DTOs.Quests;
 using QuestifyLife.Application.Interfaces;
 using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
-using QuestifyLife.API.Extensions;
 
 namespace QuestifyLife.API.Controllers
 
@@ -38,6 +39,13 @@ namespace QuestifyLife.API.Controllers
             var userId = User.GetUserId(); // Token'dan al
             var quests = await _questService.GetPendingQuestsAsync(userId);
             return Ok(quests);
+        }
+        [HttpGet("pinned-templates")]
+        public async Task<IActionResult> GetPinnedTemplates()
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var result = await _questService.GetPinnedTemplatesAsync(userId);
+            return Ok(result);
         }
 
         [HttpPost("toggle/{id}")]
