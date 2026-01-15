@@ -38,6 +38,13 @@ const UserProfileModal = ({ userId, onClose }) => {
         fetchUser();
     }, [userId]);
 
+    // Level Hesaplama Yardımcısı (Backend'den gelmezse diye fallback)
+    const getUserLevel = (u) => {
+        if (u.level) return u.level;
+        // Eğer backend'de level yoksa formülle hesapla:
+        return Math.floor((u.totalXp || 0) / 1000) + 1;
+    };
+
     if (!userId) return null;
 
     return (
@@ -56,23 +63,34 @@ const UserProfileModal = ({ userId, onClose }) => {
                         {/* Üst Header (Arkaplan) */}
                         <div className="h-32 bg-gradient-to-br from-blue-500 to-purple-200 relative">
                             {/* İstatistikler */}
-                            <div className="absolute -bottom-8 left-0 right-0 flex justify-center gap-12 px-4">
-                                <div className="text-center">
-                                    <span className="block text-3xl font-black text-red-500 drop-shadow-md">{user.totalXp}</span>
-                                    <span className="text-[10px] text-black-100 font-bold uppercase">XP</span>
+                            <div className="absolute -bottom-8 left-0 right-0 flex justify-center items-end gap-6 px-4">
+                                {/* XP KUTUSU */}
+                                <div className="text-center bg-white/80 backdrop-blur-sm p-2 rounded-xl shadow-sm min-w-[70px]">
+                                    <span className="block text-xl font-black text-indigo-600">{user.totalXp}</span>
+                                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wide">XP</span>
                                 </div>
-                                <div className="w-8"></div> {/* Boşluk (Avatar gelecek) */}
-                                <div className="text-center">
-                                    <span className="block text-3xl font-black text-red-500 drop-shadow-md">{user.currentStreak}🔥</span>
-                                    <span className="text-[10px] text-black-100 font-bold uppercase">Seri</span>
+
+                                {/* ORTA - AVATAR YERİ (Boşluk bırakıyoruz, aşağıda absolute ile gelecek) */}
+                                <div className="w-20"></div> 
+
+                                {/* SERİ KUTUSU */}
+                                <div className="text-center bg-white/80 backdrop-blur-sm p-2 rounded-xl shadow-sm min-w-[70px]">
+                                    <span className="block text-xl font-black text-orange-500">{user.currentStreak}🔥</span>
+                                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wide">Seri</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Avatar */}
-                        <div className="relative flex justify-center -mt-12 mb-3">
-                            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-5xl border-4 border-white shadow-md">
+                        {/* Avatar ve Level */}
+                        <div className="relative flex flex-col items-center -mt-16 mb-4">
+                            {/* AVATAR */}
+                            <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center text-6xl border-4 border-white shadow-lg z-10">
                                 {getAvatarEmoji(user.avatarId)}
+                            </div>
+                            
+                            {/* YENİ: LEVEL BADGE */}
+                            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-md border-2 border-white -mt-4 z-20 uppercase tracking-wider">
+                                LEVEL {getUserLevel(user)}
                             </div>
                         </div>
 

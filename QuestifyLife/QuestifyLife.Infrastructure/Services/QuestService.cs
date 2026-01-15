@@ -3,6 +3,7 @@ using QuestifyLife.Application.DTOs.Common;
 using QuestifyLife.Application.DTOs.Quests;
 using QuestifyLife.Application.Interfaces;
 using QuestifyLife.Domain.Entities;
+using QuestifyLife.Infrastructure.Persistence.Contexts;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +13,7 @@ namespace QuestifyLife.Infrastructure.Services
 {
     public class QuestService : IQuestService
     {
+        private readonly QuestifyLifeDbContext _context;
         private readonly IGenericRepository<Quest> _questRepository;
         private readonly IGenericRepository<User> _userRepository;
         private readonly IBadgeService _badgeService;
@@ -21,11 +23,13 @@ namespace QuestifyLife.Infrastructure.Services
         private const int MAX_QUEST_POINTS = 30;
 
         public QuestService(
+            QuestifyLifeDbContext context,
             IGenericRepository<Quest> questRepository,
             IGenericRepository<User> userRepository,
             IBadgeService badgeService,
             IGenericRepository<DailyPerformance> dailyPerformanceRepository)
         {
+            _context = context;
             _questRepository = questRepository;
             _userRepository = userRepository;
             _badgeService = badgeService;
@@ -174,83 +178,131 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<OperationResultDto> ToggleQuestStatusAsync(Guid questId, Guid userId)
         {
-            var quest = await _questRepository.GetByIdAsync(questId);
-            if (quest == null) return new OperationResultDto { IsSuccess = false, Message = "Görev bulunamadı." };
-            if (quest.UserId != userId) return new OperationResultDto { IsSuccess = false, Message = "Yetkisiz işlem." };
-
-            // TR Saati
-            var trTime = DateTime.UtcNow.AddHours(3);
-            var todayTr = trTime.Date;
-
-            var todayStartUtc = todayTr.AddHours(-3);
-            var todayEndUtc = todayTr.AddDays(1).AddHours(-3).AddTicks(-1);
-
-            var user = await _userRepository.GetByIdAsync(userId);
-
-            var todayPerformance = await _dailyPerformanceRepository
-                .GetWhere(p => p.UserId == userId && p.Date >= todayStartUtc && p.Date <= todayEndUtc)
-                .FirstOrDefaultAsync();
-
-            if (todayPerformance != null && todayPerformance.IsDayClosed)
-                return new OperationResultDto { IsSuccess = false, Message = "Gün kapandı! Değişiklik yapılamaz." };
-
-            if (quest.IsCompleted)
+            // 1. Transaction Başlat (Veri Bütünlüğü İçin)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                // UNCHECK
-                quest.IsCompleted = false;
-                quest.CompletedDate = null;
+                var quest = await _questRepository.GetByIdAsync(questId);
+                if (quest == null) return new OperationResultDto { IsSuccess = false, Message = "Görev bulunamadı." };
+                if (quest.UserId != userId) return new OperationResultDto { IsSuccess = false, Message = "Yetkisiz işlem." };
 
-                if (user != null) user.TotalXp -= quest.RewardPoints;
+                // TR Saati Ayarları (Senin kodundan korundu)
+                var trTime = DateTime.UtcNow.AddHours(3);
+                var todayTr = trTime.Date;
+                var todayStartUtc = todayTr.AddHours(-3);
+                var todayEndUtc = todayTr.AddDays(1).AddHours(-3).AddTicks(-1);
 
-                if (todayPerformance != null)
+                var user = await _userRepository.GetByIdAsync(userId);
+
+                // Günlük Performans Kaydını Bul
+                var todayPerformance = await _dailyPerformanceRepository
+                    .GetWhere(p => p.UserId == userId && p.Date >= todayStartUtc && p.Date <= todayEndUtc)
+                    .FirstOrDefaultAsync();
+
+                if (todayPerformance != null && todayPerformance.IsDayClosed)
+                    return new OperationResultDto { IsSuccess = false, Message = "Gün kapandı! Değişiklik yapılamaz." };
+
+                bool isLevelUp = false;
+                int pointsChange = 0;
+
+                // --- SENARYO 1: GÖREVİ GERİ ALMA (UNCHECK) ---
+                if (quest.IsCompleted)
                 {
-                    todayPerformance.TotalPointsEarned -= quest.RewardPoints;
-                    _dailyPerformanceRepository.Update(todayPerformance);
-                }
+                    quest.IsCompleted = false;
+                    quest.CompletedDate = null;
+                    pointsChange = -quest.RewardPoints;
 
-                _questRepository.Update(quest);
-                if (user != null) _userRepository.Update(user);
-                await _questRepository.SaveAsync();
-
-                return new OperationResultDto { IsSuccess = true, Message = "Geri alındı.", EarnedPoints = -quest.RewardPoints, IsCompleted = false };
-            }
-            else
-            {
-                // CHECK
-                quest.IsCompleted = true;
-                quest.CompletedDate = trTime;
-
-                if (user != null) user.TotalXp += quest.RewardPoints;
-
-                if (todayPerformance == null)
-                {
-                    todayPerformance = new DailyPerformance
+                    if (user != null)
                     {
-                        UserId = userId,
-                        // Kayıt tarihini de TR Saati olarak atıyoruz
-                        Date = trTime,
-                        TotalPointsEarned = quest.RewardPoints
-                    };
-                    await _dailyPerformanceRepository.AddAsync(todayPerformance);
+                        user.TotalXp += pointsChange; // Puanı düş
+                        // Level düşürmüyoruz (Genelde oyunlarda level düşmez, sadece puan düşer)
+                    }
+
+                    if (todayPerformance != null)
+                    {
+                        todayPerformance.TotalPointsEarned += pointsChange;
+                        _dailyPerformanceRepository.Update(todayPerformance);
+                    }
                 }
+                // --- SENARYO 2: GÖREVİ TAMAMLAMA (CHECK) ---
                 else
                 {
-                    todayPerformance.TotalPointsEarned += quest.RewardPoints;
-                    _dailyPerformanceRepository.Update(todayPerformance);
+                    quest.IsCompleted = true;
+                    quest.CompletedDate = trTime;
+                    pointsChange = quest.RewardPoints;
+
+                    if (user != null)
+                    {
+                        user.TotalXp += pointsChange;
+
+                        // --- YENİ EKLENEN: LEVEL ATLAMA MANTIĞI ---
+                        // Formül: Her 1000 Puan = 1 Level (Örnek)
+                        // Mevcut Level = (TotalXP / 1000) + 1
+                        int calculatedLevel = (user.TotalXp / 1000) + 1;
+                        if (calculatedLevel > user.Level)
+                        {
+                            user.Level = calculatedLevel;
+                            isLevelUp = true;
+                        }
+                        // -------------------------------------------
+                    }
+
+                    // Performans Kaydı Oluştur veya Güncelle
+                    if (todayPerformance == null)
+                    {
+                        todayPerformance = new DailyPerformance
+                        {
+                            UserId = userId,
+                            Date = trTime,
+                            TotalPointsEarned = pointsChange
+                        };
+                        await _dailyPerformanceRepository.AddAsync(todayPerformance);
+                    }
+                    else
+                    {
+                        todayPerformance.TotalPointsEarned += pointsChange;
+                        _dailyPerformanceRepository.Update(todayPerformance);
+                    }
                 }
 
+                // Tüm Değişiklikleri Kaydet
                 _questRepository.Update(quest);
                 if (user != null) _userRepository.Update(user);
+
+                // Entity Framework Core'da tek bir SaveAsync tüm update'leri commit eder
                 await _questRepository.SaveAsync();
 
+                // Rozetleri Kontrol Et (Sadece tamamlama durumunda)
                 List<string> newBadges = new List<string>();
-                try
+                if (quest.IsCompleted)
                 {
-                    newBadges = await _badgeService.CheckAndAwardBadgesAsync(quest.UserId);
+                    try
+                    {
+                        newBadges = await _badgeService.CheckAndAwardBadgesAsync(quest.UserId);
+                    }
+                    catch { /* Loglama eklenebilir */ }
                 }
-                catch { }
 
-                return new OperationResultDto { IsSuccess = true, Message = "Tamamlandı!", EarnedPoints = quest.RewardPoints, NewBadges = newBadges, IsCompleted = true };
+                // Transaction'ı Onayla
+                await transaction.CommitAsync();
+
+                // Kullanıcıya Dönülecek Mesaj
+                string msg = quest.IsCompleted ? "Tamamlandı!" : "Geri alındı.";
+                if (isLevelUp) msg += $" TEBRİKLER! LEVEL {user.Level} OLDUN!";
+
+                return new OperationResultDto
+                {
+                    IsSuccess = true,
+                    Message = msg,
+                    EarnedPoints = pointsChange,
+                    NewBadges = newBadges,
+                    IsCompleted = quest.IsCompleted
+                };
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return new OperationResultDto { IsSuccess = false, Message = $"Hata: {ex.Message}" };
             }
         }
 

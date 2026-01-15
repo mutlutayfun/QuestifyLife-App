@@ -13,6 +13,7 @@ namespace QuestifyLife.Application.DTOs.Auth
         public string Email { get; set; } = string.Empty;
         public int TotalXp { get; set; }
         public int CurrentStreak { get; set; }
+        public int Level { get; set; }
         public int DailyTargetPoints { get; set; }
         public int PointsEarnedThisWeek { get; set; }
         public int PointsEarnedThisMonth { get; set; }

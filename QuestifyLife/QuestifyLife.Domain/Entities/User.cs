@@ -19,6 +19,7 @@ public class User : BaseEntity
     // OYUNLAŞTIRMA AYARLARI
     public int DailyTargetPoints { get; set; } = 100; // Varsayılan hedef
     public int TotalXp { get; set; } = 0; // Genel tecrübe puanı (Level sistemi için)
+    public int Level { get; set; } = 1;
     public int CurrentStreak { get; set; } = 0; // Kaç gündür hedefe ulaşıyor?
 
     public int WeeklyTargetPoints { get; set; } = 500;

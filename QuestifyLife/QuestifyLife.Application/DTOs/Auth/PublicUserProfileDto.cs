@@ -13,6 +13,7 @@ namespace QuestifyLife.Application.DTOs.Auth
         public string AvatarId { get; set; }
         public int TotalXp { get; set; }
         public int CurrentStreak { get; set; }
+        public int Level { get; set; }
         public string PersonalManifesto { get; set; } // Kullanıcının sözü
         public DateTime JoinDate { get; set; } // Ne zamandır üye?
 
