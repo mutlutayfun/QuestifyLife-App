@@ -66,6 +66,8 @@ export default function Leaderboard() {
                 <div className="text-center py-6">
                     <h1 className="text-2xl font-black text-gray-800 tracking-tight">Liderlik Tablosu</h1>
                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">En Efsanevi Maceracılar</p>
+                    <br />
+                    <br />
                 </div>
 
                 {/* 🏆 KÜRSÜ ALANI (TOP 3) */}
