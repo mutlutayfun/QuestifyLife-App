@@ -3,7 +3,7 @@ using QuestifyLife.Application.DTOs.Common;
 using QuestifyLife.Application.DTOs.Performance;
 using QuestifyLife.Application.DTOs.Quests;
 using QuestifyLife.Application.Interfaces;
-using QuestifyLife.Application.Wrappers; // Senin yapındaki Wrapper
+using QuestifyLife.Application.Wrappers;
 using QuestifyLife.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -36,60 +36,24 @@ namespace QuestifyLife.Infrastructure.Services
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new Exception("Kullanıcı bulunamadı.");
 
-            // 1. Hedef Tarihi Belirle
-            // Frontend'den tarih geldiyse onu al, yoksa bugünü al.
-            // Önemli: Gelen tarih UTC ise ve Frontend TR saati gönderiyorsa, 
-            // burada sadece .Date kısmını almak yeterli olmayabilir.
-            // Ancak Frontend'de .toISOString() kullandık, bu UTC gönderir.
-            // Biz basitçe gelen tarihin "Günün Başlangıcı" olduğunu varsayalım.
+            DateTime targetDate = date.HasValue ? date.Value.Date : DateTime.UtcNow.Date;
 
-            DateTime targetDate;
-            if (date.HasValue)
-            {
-                targetDate = date.Value.Date;
-            }
-            else
-            {
-                targetDate = DateTime.UtcNow.Date; // Varsayılan Bugün
-            }
-
-            // Veritabanında arama yapmak için UTC aralığı oluştur
-            // Not: Senin sisteminde tarihler nasıl kaydediliyor? 
-            // QuestService'te TR saati (+3) eklenip kaydedildiğini görmüştüm.
-            // Eğer veritabanına TR saati ile kaydettiysen, burada da TR saati ile sorgulamalısın.
-            // Senin mevcut kodunda: q.ScheduledDate.Date == today kullanılmış.
-
-            // Mevcut koduna sadık kalarak:
-            // "today" değişkeni yerine "targetDate" kullanacağız.
-
-            // 2. Seçili Günün Görevlerini Çek
-            // NOT: EF Core'da .Date kullanımı bazen saat farkından dolayı sorun yaratabilir.
-            // Garanti olsun diye aralık (Range) sorgusu yapalım.
-            var dayStart = targetDate;
-            var dayEnd = targetDate.AddDays(1).AddTicks(-1);
-
-            // Eğer senin sisteminde UTC+3 kaydı varsa ve sunucu UTC ise:
-            // Bu kısım biraz karışık olabilir, senin mevcut yapını bozmadan 
-            // "q.ScheduledDate.Date == targetDate" mantığını koruyalım.
-            // Ancak QuestService'de "ScheduledDate = trTime" yaptığını biliyorum.
-            // Bu yüzden gelen "date" parametresini de TR saatine uygun hale getirmek gerekebilir.
-            // Şimdilik en güvenli yol, mevcut yapını kopyalamak:
-
+            // 1. O günün görevlerini çek
             var targetQuests = await _questRepository
                 .GetWhere(q => q.UserId == userId && q.ScheduledDate.Date == targetDate)
                 .ToListAsync();
 
-            // 3. Puan Hesapla
+            // 2. Kazanılan puanı hesapla (görevlerden)
             var pointsEarnedOnTargetDate = targetQuests
                 .Where(q => q.IsCompleted)
                 .Sum(q => q.RewardPoints);
 
-            // 4. Performans Kaydını Çek
+            // 3. Performans kaydını çek
             var targetPerformance = await _dailyPerformanceRepository
                 .GetWhere(d => d.UserId == userId && d.Date == targetDate)
                 .FirstOrDefaultAsync();
 
-            // 5. Pinlenen Şablonları Çek (Bunlar tarihten bağımsızdır, her zaman gelir)
+            // 4. Pinlenmiş (Sabit) görev şablonlarını çek
             var allPinned = await _questRepository
                 .GetWhere(q => q.UserId == userId && q.IsPinned)
                 .OrderByDescending(q => q.CreatedDate)
@@ -118,13 +82,12 @@ namespace QuestifyLife.Infrastructure.Services
                 DailyTarget = user.DailyTargetPoints,
                 CurrentStreak = user.CurrentStreak,
 
-                // Seçili güne ait puan
+                // Bugün kazanılan puan
                 PointsEarnedToday = pointsEarnedOnTargetDate,
 
-                // Seçili gün kapalı mı?
+                // DÜZELTME: Entity'deki isim "IsDayClosed"
                 IsDayClosed = targetPerformance != null ? targetPerformance.IsDayClosed : false,
 
-                // Seçili günün görevleri
                 TodayQuests = targetQuests.Select(q => new QuestDto
                 {
                     Id = q.Id,
@@ -148,59 +111,87 @@ namespace QuestifyLife.Infrastructure.Services
 
             var today = DateTime.UtcNow.Date;
 
-            var existingPerformance = await _dailyPerformanceRepository
+            // 1. Bugünün performans kaydını bul
+            var performance = await _dailyPerformanceRepository
                 .GetWhere(d => d.UserId == userId && d.Date == today)
                 .FirstOrDefaultAsync();
 
-            if (existingPerformance != null)
-                return new OperationResultDto { IsSuccess = false, Message = "Bugün zaten kapatılmış!" };
+            // 2. KONTROL: Kayıt var VE IsDayClosed=true ise hata ver.
+            // DÜZELTME: Entity'deki isim "IsDayClosed"
+            if (performance != null && performance.IsDayClosed)
+            {
+                return new OperationResultDto { IsSuccess = false, Message = "Bugün zaten kapatılmış! Yarın görüşürüz. 👋" };
+            }
 
             var todaysQuests = await _questRepository
                 .GetWhere(q => q.UserId == userId && q.ScheduledDate.Date == today)
                 .ToListAsync();
 
             int earnedPoints = todaysQuests.Where(q => q.IsCompleted).Sum(q => q.RewardPoints);
-
-            // PenaltyPoints modelinde yoksa hata verebilir, eğer yoksa burayı 0 yapabilirsin.
-            // Senin kodunda olduğu için bıraktım.
+            // Ceza puanlarını hesapla (tamamlanmamış görevlerden)
             int penaltyPoints = todaysQuests.Where(q => !q.IsCompleted).Sum(q => q.PenaltyPoints);
 
-            int netScore = earnedPoints + penaltyPoints;
-
-            user.TotalXp += penaltyPoints;
+            // Ceza puanlarını kullanıcıdan düşüyoruz (0'ın altına inmesin)
+            if (penaltyPoints > 0)
+            {
+                user.TotalXp = Math.Max(0, user.TotalXp - penaltyPoints);
+            }
 
             bool isTargetReached = earnedPoints >= user.DailyTargetPoints;
+
+            // Streak (Seri) Güncelleme
             if (isTargetReached)
             {
+                // Eğer gün daha önce kapatılmadıysa seriyi artır
                 user.CurrentStreak++;
             }
             else
             {
+                // Hedefe ulaşılamadıysa seri sıfırlanır
                 user.CurrentStreak = 0;
             }
 
-            var dailyPerf = new DailyPerformance
+            // 3. Kayıt İşlemi (Ekleme veya Güncelleme)
+            if (performance == null)
             {
-                UserId = userId,
-                Date = today,
-                TotalPointsEarned = earnedPoints,
-                IsTargetReached = isTargetReached,
-                IsDayClosed = true,
-                RolloverDebt = isTargetReached ? 0 : (user.DailyTargetPoints - earnedPoints),
-                DayNote = dayNote
-            };
+                // Hiç kayıt yoksa yeni oluştur
+                performance = new DailyPerformance
+                {
+                    UserId = userId,
+                    Date = today,
+                    TotalPointsEarned = earnedPoints,
+                    IsTargetReached = isTargetReached,
+                    IsDayClosed = true, // Günü kapatıyoruz
+                    RolloverDebt = isTargetReached ? 0 : (user.DailyTargetPoints - earnedPoints),
+                    DayNote = dayNote
+                };
+                await _dailyPerformanceRepository.AddAsync(performance);
+            }
+            else
+            {
+                // Kayıt varsa (gün içinde işlem yapılmışsa) güncelle ve kapat
+                performance.TotalPointsEarned = earnedPoints;
+                performance.IsTargetReached = isTargetReached;
+                performance.IsDayClosed = true; // Günü kapatıyoruz
+                performance.RolloverDebt = isTargetReached ? 0 : (user.DailyTargetPoints - earnedPoints);
+                performance.DayNote = dayNote;
 
-            await _dailyPerformanceRepository.AddAsync(dailyPerf);
+                _dailyPerformanceRepository.Update(performance);
+            }
+
+            // Kullanıcıyı güncelle (Streak ve XP değiştiği için)
             _userRepository.Update(user);
+
             await _userRepository.SaveAsync();
             await _dailyPerformanceRepository.SaveAsync();
 
+            // Rozet kontrolü yap
             var newBadges = await _badgeService.CheckAndAwardBadgesAsync(userId);
 
             return new OperationResultDto
             {
                 IsSuccess = true,
-                Message = $"Gün kapatıldı! Net Skor: {netScore}. Hedef: {(isTargetReached ? "Başarılı" : "Başarısız")}.",
+                Message = $"Gün başarıyla kapatıldı! {(isTargetReached ? "Hedefe ulaştın! 🔥" : "Hedef tamamlanamadı.")}",
                 NewBadges = newBadges
             };
         }
@@ -227,6 +218,9 @@ namespace QuestifyLife.Infrastructure.Services
                 Points = p.TotalPointsEarned,
                 TargetReached = p.IsTargetReached,
                 Note = p.DayNote,
+
+              
+
                 CompletedQuests = quests
                     .Where(q => q.ScheduledDate.Date == p.Date.Date)
                     .Select(q => new CalendarQuestDto

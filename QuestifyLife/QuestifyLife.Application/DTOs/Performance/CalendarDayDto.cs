@@ -14,6 +14,8 @@ namespace QuestifyLife.Application.DTOs.Performance
         public string? Note { get; set; }
         public int CompletedQuestCount { get; set; }
 
+        public bool IsDayClosed { get; set; }
+
         // Artık sadece string değil, detaylı nesne listesi tutuyoruz
         public List<CalendarQuestDto> CompletedQuests { get; set; } = new List<CalendarQuestDto>();
     }
