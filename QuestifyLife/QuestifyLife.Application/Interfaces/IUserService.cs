@@ -13,5 +13,6 @@ namespace QuestifyLife.Application.Interfaces
         Task<UserProfileDto> GetProfileAsync(Guid userId);
         Task<bool> UpdateProfileAsync(Guid userId, UpdateProfileDto request);
         Task<ServiceResponse<PublicUserProfileDto>> GetPublicUserProfileAsync(Guid targetUserId);
+        Task<ServiceResponse<bool>> CompleteTutorialAsync(Guid userId);
     }
 }

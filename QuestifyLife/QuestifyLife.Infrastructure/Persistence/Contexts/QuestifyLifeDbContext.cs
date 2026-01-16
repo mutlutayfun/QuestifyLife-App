@@ -24,6 +24,7 @@ namespace QuestifyLife.Infrastructure.Persistence.Contexts
         public DbSet<Friendship> Friendships { get; set; }
         public DbSet<Badge> Badges { get; set; }
         public DbSet<UserBadge> UserBadges { get; set; }
+        public DbSet<Feedback> Feedbacks { get; set; }
 
         // Veritabanı oluşurken özel ayarlar yapmak için bu metodu eziyoruz (override).
         protected override void OnModelCreating(ModelBuilder modelBuilder)

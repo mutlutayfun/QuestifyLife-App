@@ -23,6 +23,8 @@ namespace QuestifyLife.Application.DTOs.Auth
         public int YearlyTargetPoints { get; set; }
         public string? PersonalManifesto { get; set; }
         public string AvatarId { get; set; } // Profilde görünsün
+
+        public bool HasSeenTutorial { get; set; }
         public List<BadgeDto> Badges { get; set; } = new List<BadgeDto>();
     }
 }

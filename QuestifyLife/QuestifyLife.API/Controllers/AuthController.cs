@@ -32,7 +32,8 @@ namespace QuestifyLife.API.Controllers
                     Username = user.Username,
                     Email = user.Email,
                     DailyTargetPoints = user.DailyTargetPoints,
-                    TotalXp = user.TotalXp
+                    TotalXp = user.TotalXp,
+                    HasSeenTutorial = user.HasSeenTutorial
                 };
                 return Ok(userDto);
             }
@@ -59,7 +60,8 @@ namespace QuestifyLife.API.Controllers
                 Username = user.Username,
                 Email = user.Email,
                 DailyTargetPoints = user.DailyTargetPoints,
-                TotalXp = user.TotalXp
+                TotalXp = user.TotalXp,
+                HasSeenTutorial = user.HasSeenTutorial
             };
 
             return Ok(new { message = "Giriş başarılı!", token = token, user = userDto });

@@ -60,7 +60,7 @@ namespace QuestifyLife.Infrastructure.Services
                 DailyTargetPoints = user.DailyTargetPoints,
                 PersonalManifesto = user.PersonalManifesto,
                 AvatarId = user.AvatarId,
-
+                HasSeenTutorial = user.HasSeenTutorial,
                 // YENİ ALANLAR (HESAPLANAN VERİLER)
                 WeeklyTargetPoints = user.WeeklyTargetPoints,
                 MonthlyTargetPoints = user.MonthlyTargetPoints,
@@ -127,6 +127,19 @@ namespace QuestifyLife.Infrastructure.Services
             _userRepository.Update(user);
             await _userRepository.SaveAsync();
             return true;
+        }
+
+        public async Task<ServiceResponse<bool>> CompleteTutorialAsync(Guid userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null) return new ServiceResponse<bool> { Success = false, Message = "Kullanıcı bulunamadı." };
+
+            user.HasSeenTutorial = true;
+
+            _userRepository.Update(user);
+            await _userRepository.SaveAsync();
+
+            return new ServiceResponse<bool> { Success = true, Message = "Tutorial tamamlandı." };
         }
     }
 }

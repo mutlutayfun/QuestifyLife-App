@@ -13,6 +13,8 @@ public class User : BaseEntity
     public string? PersonalManifesto { get; set; }
     public string AvatarId { get; set; } = "avatar_1";
 
+    public bool HasSeenTutorial { get; set; } = false;
+
     // --- YENİ EKLENEN ALANLAR (Şifre Sıfırlama İçin) ---
     public string? PasswordResetToken { get; set; }
     public DateTime? PasswordResetTokenExpires { get; set; }

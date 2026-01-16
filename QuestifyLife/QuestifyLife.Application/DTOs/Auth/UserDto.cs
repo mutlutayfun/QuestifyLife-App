@@ -13,4 +13,5 @@ public class UserDto
     public string Email { get; set; } = string.Empty;
     public int DailyTargetPoints { get; set; }
     public int TotalXp { get; set; }
+    public bool HasSeenTutorial { get; set; }
 }

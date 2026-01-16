@@ -9,17 +9,21 @@ import DayEndModal from '../components/DayEndModal';
 import EditQuestModal from '../components/EditQuestModal';
 import Confetti from 'react-confetti';
 import { toast } from 'react-toastify';
-import { format, addDays, isSameDay } from 'date-fns'; // npm install date-fns
+import { format, addDays, isSameDay } from 'date-fns'; 
 import { tr } from 'date-fns/locale'; 
 
+import DailyQuote from '../components/DailyQuote';
+import TutorialModal from '../components/TutorialModal';
+import FeedbackModal from '../components/FeedbackModal';
+
 export default function Dashboard() {
-    const { user, logout } = useContext(AuthContext);
+    // updateUser fonksiyonunu context'ten alıyoruz
+    const { user, logout, updateUser } = useContext(AuthContext);
     const [dashboardData, setDashboardData] = useState(null);
     const [pinnedTemplates, setPinnedTemplates] = useState([]); 
     const [loading, setLoading] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     
-    // YENİ: Seçili Tarih State'i (Varsayılan Bugün)
     const [selectedDate, setSelectedDate] = useState(new Date());
 
     const [isDayEndModalOpen, setIsDayEndModalOpen] = useState(false);
@@ -27,67 +31,57 @@ export default function Dashboard() {
     const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
     const [editingQuest, setEditingQuest] = useState(null);
 
-    // Pencere boyutu izleme (Konfeti için)
+    const [showTutorial, setShowTutorial] = useState(false);
+    const [showFeedback, setShowFeedback] = useState(false);
+
     useEffect(() => {
         const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // VERİ ÇEKME
+    // Tutorial Kontrolü
     useEffect(() => {
-        const fetchData = async () => {
+        const checkTutorialStatus = async () => {
             try {
-                // Backend'e tarih parametresi gönderiyoruz (ISO formatında)
-                // Eğer backend 'date' parametresini destekliyorsa o güne ait veriyi dönecek.
-                // Desteklemiyorsa (eski backend) sadece bugünü dönecek.
-                const formattedDate = selectedDate.toISOString();
-                const response = await api.get(`/Performance/dashboard?date=${formattedDate}`);
-                
-                setDashboardData(response.data);
-                
-                // Pinlenen şablonlar tarihten bağımsız gelir (genelde ayrı bir liste veya dashboard içinde)
-                if (response.data.pinnedTemplates) {
-                    setPinnedTemplates(response.data.pinnedTemplates);
-                } else {
-                    setPinnedTemplates([]);
+                if (user && user.hasSeenTutorial === false) {
+                     setShowTutorial(true);
+                } else if (user && user.hasSeenTutorial === undefined) {
+                     const res = await api.get('/User/profile');
+                     const profileData = res.data.data || res.data; 
+                     
+                     if (profileData && profileData.hasSeenTutorial === false) {
+                         setShowTutorial(true);
+                     }
                 }
-
-            } catch (error) {
-                console.error("Veri hatası:", error);
-                if(error.response?.status === 401) logout();
-                // Veri çekme hatası kritik değilse kullanıcıya göstermeyebiliriz veya hafif bir uyarı verebiliriz.
-            } finally {
-                setLoading(false);
+            } catch (e) {
+                console.error("Tutorial check failed", e);
             }
         };
-        fetchData();
-    }, [refreshTrigger, logout, selectedDate]); // Tarih veya trigger değişince yenile
+        if (user) {
+            checkTutorialStatus();
+        }
+    }, [user]); 
 
-    // TARİH DEĞİŞTİRME FONKSİYONLARI
-    const handlePrevDay = () => {
-        setSelectedDate(prev => addDays(prev, -1));
+    // YENİ: Tutorial tamamlandığında çalışacak fonksiyon
+    const handleTutorialComplete = () => {
+        // 1. Modalı kapat
+        setShowTutorial(false);
+        // 2. Context'teki kullanıcı bilgisini güncelle (Böylece sayfalar arası geçişte tekrar çıkmaz)
+        updateUser({ hasSeenTutorial: true });
+        
+        toast.success("Maceraya hazırsın! İlk görevini ekleyerek başla. 🚀");
     };
 
-    const handleNextDay = () => {
-        setSelectedDate(prev => addDays(prev, 1));
-    };
+    // ... (VERİ ÇEKME, TARİH NAVİGASYONU, DİĞER FONKSİYONLAR AYNI KALIYOR) ...
+    // ... Bu kısmı tekrar yazmıyorum, mevcut kodlarını koru ...
     
-    const handleGoToday = () => {
-        setSelectedDate(new Date());
-    };
-
-    // Bugün mü kontrolü
-    const isToday = isSameDay(selectedDate, new Date());
-    // Gelecek mi kontrolü (Tiklemeyi engellemek için)
-    const isFuture = selectedDate > new Date() && !isToday;
-
-    // GÖREV EKLEME (Seçili tarihe ekler)
+    // GÖREV EKLEME
     const handleAddQuest = async (questData) => {
         try {
             const payload = {
                 ...questData,
-                scheduledDate: selectedDate.toISOString() // Seçili güne ekle
+                scheduledDate: selectedDate.toISOString() 
             };
             
             await api.post('/Quests', payload);
@@ -95,14 +89,12 @@ export default function Dashboard() {
             toast.success("Görev başarıyla eklendi! 🚀");
         } catch (error) {
             console.error(error);
-            // HATA YÖNETİMİ İYİLEŞTİRİLDİ
-            // Backend'den gelen özel mesajı al, yoksa varsayılan mesajı göster
             const errorMessage = error.response?.data?.message || "Görev ekleme başarısız.(Günlük Puan sınırına ulaşılmış olabilir.)";
             toast.error(errorMessage);
         }
     };
-
-    // ŞABLONDAN EKLEME (Seçili tarihe ekler)
+    
+    // ŞABLONDAN EKLEME
     const handleAddFromTemplate = async (template) => {
         if (isToday && dashboardData?.isDayClosed) {
             toast.warning("Bugün kapandı, yeni görev ekleyemezsin!");
@@ -115,7 +107,7 @@ export default function Dashboard() {
             rewardPoints: template.rewardPoints,
             category: template.category || "Genel",
             colorCode: template.colorCode || "#3498db",
-            scheduledDate: selectedDate.toISOString() // Seçili güne ekle
+            scheduledDate: selectedDate.toISOString()
         };
 
         try {
@@ -124,8 +116,7 @@ export default function Dashboard() {
             toast.success(`"${template.title}" listeye eklendi! 🚀`);
         } catch (error) {
             console.error(error);
-            // HATA YÖNETİMİ İYİLEŞTİRİLDİ
-            const errorMessage = error.response?.data?.message || "Şablondan ekleme başarısız.(Günlük Puan sınırına ulaşılmış olabilir.)";
+            const errorMessage = error.response?.data?.message || "Şablondan ekleme başarısız.";
             toast.error(errorMessage);
         }
     };
@@ -177,7 +168,6 @@ export default function Dashboard() {
                 description: updatedQuest.description,
                 rewardPoints: updatedQuest.rewardPoints || updatedQuest.points, 
                 category: updatedQuest.category,
-                // Pin durumu update ile değil, ayrı endpoint ile değişiyor
             };
 
             await api.put('/Quests', payload); 
@@ -190,9 +180,7 @@ export default function Dashboard() {
         }
     };
 
-    // GÖREV TAMAMLAMA (Kısıtlama Eklendi)
     const handleToggleQuest = async (id) => {
-        // YENİ: Gelecek görevler tamamlanamaz
         if (isFuture) {
             toast.warning("Acele etme! Bu görev yarına ait. ⏳");
             return;
@@ -203,7 +191,7 @@ export default function Dashboard() {
             
             if(res.data) {
                 if(!res.data.isSuccess && res.data.message) {
-                    toast.warning(res.data.message); // Başarısız işlem mesajı (örn: Gün kapalı)
+                    toast.warning(res.data.message); 
                     return;
                 }
 
@@ -218,7 +206,7 @@ export default function Dashboard() {
                 }
                 
                 if(res.data.newBadges && res.data.newBadges.length > 0) {
-                     toast.info(`🏅 Yeni Rozet: ${res.data.newBadges.join(", ")}`);
+                      toast.info(`🏅 Yeni Rozet: ${res.data.newBadges.join(", ")}`);
                 }
                 setRefreshTrigger(p => p + 1);
             }
@@ -240,6 +228,50 @@ export default function Dashboard() {
             toast.error(errorMessage);
         }
     };
+    
+    // VERİ ÇEKME
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const formattedDate = selectedDate.toISOString();
+                const response = await api.get(`/Performance/dashboard?date=${formattedDate}`);
+                
+                setDashboardData(response.data);
+                
+                if (response.data.pinnedTemplates) {
+                    setPinnedTemplates(response.data.pinnedTemplates);
+                } else {
+                    setPinnedTemplates([]);
+                }
+
+            } catch (error) {
+                console.error("Veri hatası:", error);
+                if(error.response?.status === 401) logout();
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [refreshTrigger, logout, selectedDate]); 
+
+    // TARİH DEĞİŞTİRME FONKSİYONLARI
+    const handlePrevDay = () => {
+        setSelectedDate(prev => addDays(prev, -1));
+    };
+
+    const handleNextDay = () => {
+        setSelectedDate(prev => addDays(prev, 1));
+    };
+    
+    const handleGoToday = () => {
+        setSelectedDate(new Date());
+    };
+
+    // Bugün mü kontrolü
+    const isToday = isSameDay(selectedDate, new Date());
+    // Gelecek mi kontrolü (Tiklemeyi engellemek için)
+    const isFuture = selectedDate > new Date() && !isToday;
+
 
     if (loading) return <div className="min-h-screen flex items-center justify-center text-primary animate-pulse">Yükleniyor...</div>;
 
@@ -261,18 +293,30 @@ export default function Dashboard() {
                     quest={editingQuest}
                 />
 
+                {/* TUTORIAL MODAL - onComplete prop'unu ekledik */}
+                {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} onComplete={handleTutorialComplete} />}
+                
+                {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
                 <header className="bg-white shadow-sm sticky top-0 z-10">
                     <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
                         <div>
                             <h1 className="text-xl font-bold text-primary tracking-tight">QuestifyLife</h1>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                                {/* Başlık Dinamik Oldu */}
                                 {isToday ? "Bugün" : format(selectedDate, 'd MMMM', { locale: tr })}
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="text-sm text-gray-600 font-medium">{user?.username}</span>
-                            {/* Bitir Butonu sadece BUGÜN ise aktif olsun */}
+                            
+                            <button 
+                                onClick={() => setShowFeedback(true)}
+                                className="text-gray-400 hover:text-primary transition"
+                                title="Geri Bildirim"
+                            >
+                                📣
+                            </button>
+
                             {isToday && (
                                 <button 
                                     onClick={() => setIsDayEndModalOpen(true)}
@@ -286,7 +330,9 @@ export default function Dashboard() {
                 </header>
 
                 <main className="max-w-md mx-auto px-4 py-6 animate-fade-in-up space-y-6">
-                    
+                    {/* ... (İçerik aynı) ... */}
+                    {isToday && <DailyQuote />}
+
                     {/* İSTATİSTİK KARTLARI (Sadece Bugün Gösterilir) */}
                     {isToday ? (
                         <div className="grid grid-cols-2 gap-3">
@@ -304,14 +350,13 @@ export default function Dashboard() {
                             />
                         </div>
                     ) : (
-                        // Yarın için Planlama Modu Uyarısı
                         <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center">
                             <h3 className="text-blue-800 font-bold">📅 Planlama Modu</h3>
                             <p className="text-xs text-blue-600">Yarını şimdiden planlayarak güne önde başla!</p>
                         </div>
                     )}
                     
-                    {/* YENİ: TARİH NAVİGASYONU */}
+                    {/* TARİH NAVİGASYONU */}
                     <div className="flex items-center justify-between bg-gray-50 p-1.5 rounded-xl border border-gray-100">
                         <button onClick={handlePrevDay} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-500 hover:text-primary transition">
                             ◀
@@ -376,7 +421,7 @@ export default function Dashboard() {
                         <span>⚡</span> {isToday ? "Bugünün Görevleri" : "Planlanan Görevler"}
                     </h2>
                     
-                    {/* GÖREV EKLEME FORMU - Gelecek tarih için de çalışır */}
+                    {/* GÖREV EKLEME FORMU */}
                     <AddQuestForm onAdd={handleAddQuest} disabled={isToday && dashboardData?.isDayClosed} />
 
                     {/* GÖREV LİSTESİ */}
@@ -396,7 +441,6 @@ export default function Dashboard() {
                                     onEdit={(q) => setEditingQuest(q)}
                                     onPin={handlePinQuest}
                                     isDayClosed={dashboardData?.isDayClosed}
-                                    // YENİ: Görsel olarak disabled olduğunu belirtmek için prop
                                     disabled={isFuture} 
                                 />
                             ))

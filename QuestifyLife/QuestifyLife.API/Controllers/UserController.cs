@@ -44,5 +44,13 @@ namespace QuestifyLife.API.Controllers
             return Ok(response);
         }
 
+        [HttpPost("complete-tutorial")]
+        public async Task<IActionResult> CompleteTutorial()
+        {
+            var userId = User.GetUserId();
+            var result = await _userService.CompleteTutorialAsync(userId);
+            return Ok(result);
+        }
+
     }
 }
