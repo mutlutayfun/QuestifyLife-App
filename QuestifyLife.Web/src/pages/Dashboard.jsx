@@ -135,10 +135,30 @@ export default function Dashboard() {
         }
     }, [user]); 
 
-    const handleTutorialComplete = () => {
+    const handleTutorialComplete = async (manifestoText) => {
+        // 1. Modalı kapat
         setShowTutorial(false);
-        updateUser({ hasSeenTutorial: true });
-        toast.success("Maceraya hazırsın! İlk görevini ekleyerek başla. 🚀");
+        
+        try {
+            // 2. Backend'e güncelleme isteği at (Manifesto + Tutorial Görüldü)
+            await api.put('/User/profile', { 
+                hasSeenTutorial: true,
+                personalManifesto: manifestoText
+            });
+
+            // 3. Context'i güncelle
+            updateUser({ 
+                hasSeenTutorial: true,
+                personalManifesto: manifestoText
+            });
+            
+            toast.success("Sözün kaydedildi kahraman! Maceraya hazırsın. 🚀");
+
+        } catch (error) {
+            console.error("Tutorial update error:", error);
+            // Hata olsa bile context'i güncelle ki modal tekrar çıkmasın
+            updateUser({ hasSeenTutorial: true });
+        }
     };
 
     // VERİ ÇEKME
