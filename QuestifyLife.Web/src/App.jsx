@@ -8,12 +8,16 @@ import Profile from "./pages/Profile";
 import Friends from "./pages/Friends";
 import History from "./pages/History";
 import Leaderboard from './pages/Leaderboard';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-
-// YENİ SAYFALAR
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+
+// YENİ SAYFALAR VE BİLEŞEN
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import CookieConsent from './components/CookieConsent';
+
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -28,14 +32,19 @@ function App() {
       <AuthProvider>
         <ToastContainer position="top-right" autoClose={3000} />
         
+        {/* Çerez Uyarısı: Her sayfada görünmesi için Routes'un dışında */}
+        <CookieConsent />
+
         <Routes>
           {/* PUBLIC ROTALAR */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          
-          {/* YENİ ŞİFRE SIFIRLAMA ROTALARI */}
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* YENİ: GİZLİLİK VE KOŞULLAR (Herkese Açık) */}
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
           
           {/* PRIVATE ROTALAR */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
