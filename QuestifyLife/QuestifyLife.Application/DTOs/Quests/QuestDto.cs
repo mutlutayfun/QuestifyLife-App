@@ -17,4 +17,5 @@ public class QuestDto
     public string ColorCode { get; set; }
     public string Category { get; set; }
     public DateTime? ScheduledDate { get; set; }
+    public DateTime? ReminderDate { get; set; }
 }

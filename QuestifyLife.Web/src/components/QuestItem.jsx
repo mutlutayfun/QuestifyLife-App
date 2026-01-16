@@ -1,6 +1,6 @@
 import React from 'react';
+import { format } from 'date-fns';
 
-// Props'a isDayClosed eklendi
 const QuestItem = ({ quest, onToggle, onDelete, onEdit, onPin, isDayClosed }) => {
     return (
         <div className={`group relative flex items-center justify-between p-4 mb-3 bg-white rounded-xl shadow-sm border transition-all hover:shadow-md 
@@ -8,7 +8,6 @@ const QuestItem = ({ quest, onToggle, onDelete, onEdit, onPin, isDayClosed }) =>
             ${quest.isPinned ? 'border-l-4 border-l-yellow-400' : ''}
             ${isDayClosed ? 'opacity-60 grayscale-[0.5] pointer-events-none' : ''} 
         `}>
-            {/* isDayClosed ise pointer-events-none ile tıklamaları engelledik, görsel olarak soluklaştırdık */}
             
             <div className="flex items-center gap-3 overflow-hidden">
                 <button 
@@ -32,8 +31,17 @@ const QuestItem = ({ quest, onToggle, onDelete, onEdit, onPin, isDayClosed }) =>
                         {/* Sabitlenmiş İkonu */}
                         {quest.isPinned && <span className="text-[10px]" title="Her gün tekrar eder">📌</span>}
                     </div>
-                    <div className="flex flex-wrap gap-2 text-[10px] items-center">
+                    
+                    <div className="flex flex-wrap gap-2 text-[10px] items-center mt-0.5">
                          <span className="font-bold text-gray-400 uppercase tracking-wider">{quest.category}</span>
+                         
+                         {/* YENİ: Hatırlatıcı Göstergesi */}
+                         {quest.reminderDate && (
+                            <span className="flex items-center gap-1 font-bold text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
+                                ⏰ {format(new Date(quest.reminderDate), 'HH:mm')}
+                            </span>
+                         )}
+
                          {quest.description && <span className="text-gray-400 truncate max-w-[150px]">• {quest.description}</span>}
                     </div>
                 </div>
@@ -44,17 +52,16 @@ const QuestItem = ({ quest, onToggle, onDelete, onEdit, onPin, isDayClosed }) =>
                     +{quest.rewardPoints} XP
                 </span>
                 
-                {/* AKSİYON BUTONLARI - Gün kapalıysa GİZLE */}
+                {/* AKSİYON BUTONLARI */}
                 {!isDayClosed && (
                     <div className="flex opacity-0 group-hover:opacity-100 transition-opacity gap-1">
                         <button 
                             onClick={() => onPin(quest.id)} 
                             className={`p-1.5 rounded-lg transition-colors ${quest.isPinned ? 'text-yellow-500 bg-yellow-50' : 'text-gray-300 hover:text-yellow-500 hover:bg-yellow-50'}`}
-                            title={quest.isPinned ? "Sabitlemeyi Kaldır" : "Sabitle (Her gün tekrar et)"}
+                            title={quest.isPinned ? "Sabitlemeyi Kaldır" : "Sabitle"}
                         >
                             📌
                         </button>
-                        
                         <button 
                             onClick={() => onEdit(quest)} 
                             className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"

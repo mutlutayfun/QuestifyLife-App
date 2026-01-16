@@ -99,7 +99,10 @@ namespace QuestifyLife.Infrastructure.Services
                 CompletedDate = null,
                 Category = request.Category ?? "Genel",
                 ColorCode = request.ColorCode ?? "#3498db",
-                IsPinned = false
+                IsPinned = false,
+
+                // YENİ: Hatırlatıcı tarihini ekle
+                ReminderDate = request.ReminderDate
             };
 
             await _questRepository.AddAsync(newQuest);
@@ -155,7 +158,9 @@ namespace QuestifyLife.Infrastructure.Services
                     IsPinned = q.IsPinned,
                     ColorCode = q.ColorCode,
                     Category = q.Category,
-                    ScheduledDate = q.ScheduledDate
+                    ScheduledDate = q.ScheduledDate,
+                    // YENİ: DTO'ya hatırlatıcı tarihini ekle
+                    ReminderDate = q.ReminderDate
                 })
                 .ToListAsync();
         }
@@ -178,7 +183,9 @@ namespace QuestifyLife.Infrastructure.Services
                     RewardPoints = q.RewardPoints,
                     Category = q.Category,
                     ColorCode = q.ColorCode,
-                    IsPinned = true
+                    IsPinned = true,
+                    // Şablonlarda hatırlatıcı genelde olmaz ama varsa da ekleyelim
+                    ReminderDate = q.ReminderDate
                 })
                 .ToList();
 
@@ -350,6 +357,9 @@ namespace QuestifyLife.Infrastructure.Services
             quest.Category = request.Category ?? "Genel";
             quest.RewardPoints = request.RewardPoints;
             quest.IsPinned = request.IsPinned;
+
+            // YENİ: Hatırlatıcı tarihini güncelle
+            quest.ReminderDate = request.ReminderDate;
 
             _questRepository.Update(quest);
             await _questRepository.SaveAsync();

@@ -16,6 +16,7 @@ namespace QuestifyLife.Application.DTOs.Quests
         public int RewardPoints { get; set; }
         public string Category { get; set; }
         public bool IsPinned { get; set; }
+        public DateTime? ReminderDate { get; set; }
     }
 }
 

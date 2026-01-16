@@ -26,6 +26,8 @@ public class Quest : BaseEntity
     public DateTime ScheduledDate { get; set; } // Hangi gün için planlandı?
     public bool IsCompleted { get; set; } = false;
     public DateTime? CompletedDate { get; set; }
+
+    public DateTime? ReminderDate { get; set; }
     public bool IsPinned { get; set; }
 
     // Kategori (İş, Sağlık, Spor vb. - İleride Enum veya ayrı tablo olabilir)

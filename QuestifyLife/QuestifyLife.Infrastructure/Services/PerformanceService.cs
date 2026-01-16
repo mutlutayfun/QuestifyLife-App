@@ -71,7 +71,9 @@ namespace QuestifyLife.Infrastructure.Services
                     Category = q.Category,
                     ColorCode = q.ColorCode,
                     IsPinned = true,
-                    IsCompleted = false
+                    IsCompleted = false,
+                    // DÜZELTME: Şablonlar için de hatırlatıcıyı taşıyoruz (eğer varsa)
+                    ReminderDate = q.ReminderDate
                 })
                 .ToList();
 
@@ -97,7 +99,9 @@ namespace QuestifyLife.Infrastructure.Services
                     IsCompleted = q.IsCompleted,
                     IsPinned = q.IsPinned,
                     Category = q.Category,
-                    ColorCode = q.ColorCode
+                    ColorCode = q.ColorCode,
+                    // DÜZELTME: İşte eksik olan parça burasıydı!
+                    ReminderDate = q.ReminderDate
                 }).ToList(),
 
                 PinnedTemplates = pinnedTemplates
@@ -117,7 +121,6 @@ namespace QuestifyLife.Infrastructure.Services
                 .FirstOrDefaultAsync();
 
             // 2. KONTROL: Kayıt var VE IsDayClosed=true ise hata ver.
-            // DÜZELTME: Entity'deki isim "IsDayClosed"
             if (performance != null && performance.IsDayClosed)
             {
                 return new OperationResultDto { IsSuccess = false, Message = "Bugün zaten kapatılmış! Yarın görüşürüz. 👋" };
@@ -218,8 +221,6 @@ namespace QuestifyLife.Infrastructure.Services
                 Points = p.TotalPointsEarned,
                 TargetReached = p.IsTargetReached,
                 Note = p.DayNote,
-
-              
 
                 CompletedQuests = quests
                     .Where(q => q.ScheduledDate.Date == p.Date.Date)
