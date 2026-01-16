@@ -7,9 +7,13 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Friends from "./pages/Friends";
 import History from "./pages/History";
+import Leaderboard from './pages/Leaderboard';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Leaderboard from './pages/Leaderboard';
+
+// YENİ SAYFALAR
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -22,22 +26,24 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        {/* Bildirim Kutusu (Her sayfanın üstünde görünür) */}
         <ToastContainer position="top-right" autoClose={3000} />
         
         <Routes>
-          {/* Giriş ve Kayıt Sayfaları (Eğer bunları silerseniz login ekranı gelmez!) */}
+          {/* PUBLIC ROTALAR */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           
-          {/* Korumalı Sayfalar */}
+          {/* YENİ ŞİFRE SIFIRLAMA ROTALARI */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          
+          {/* PRIVATE ROTALAR */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           
-          {/* Bilinmeyen rotaları Login'e yönlendir */}
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </AuthProvider>

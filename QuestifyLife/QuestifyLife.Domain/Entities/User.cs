@@ -2,9 +2,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace QuestifyLife.Domain.Entities;
 
@@ -16,15 +13,21 @@ public class User : BaseEntity
     public string? PersonalManifesto { get; set; }
     public string AvatarId { get; set; } = "avatar_1";
 
+    // --- YENİ EKLENEN ALANLAR (Şifre Sıfırlama İçin) ---
+    public string? PasswordResetToken { get; set; }
+    public DateTime? PasswordResetTokenExpires { get; set; }
+    // ---------------------------------------------------
+
     // OYUNLAŞTIRMA AYARLARI
-    public int DailyTargetPoints { get; set; } = 100; // Varsayılan hedef
-    public int TotalXp { get; set; } = 0; // Genel tecrübe puanı (Level sistemi için)
+    public int DailyTargetPoints { get; set; } = 100;
+    public int TotalXp { get; set; } = 0;
     public int Level { get; set; } = 1;
-    public int CurrentStreak { get; set; } = 0; // Kaç gündür hedefe ulaşıyor?
+    public int CurrentStreak { get; set; } = 0;
 
     public int WeeklyTargetPoints { get; set; } = 500;
     public int MonthlyTargetPoints { get; set; } = 2000;
     public int YearlyTargetPoints { get; set; } = 20000;
+
     // İLİŞKİLER
     public ICollection<Quest> Quests { get; set; } = new List<Quest>();
     public ICollection<DailyPerformance> DailyPerformances { get; set; } = new List<DailyPerformance>();

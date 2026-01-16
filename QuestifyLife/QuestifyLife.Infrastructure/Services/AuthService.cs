@@ -21,35 +21,23 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<User> RegisterAsync(RegisterRequest request)
         {
-            // 1. Aynı email ile kullanıcı var mı kontrol et
             var existingUser = await _userRepository.GetWhere(u => u.Email == request.Email).FirstOrDefaultAsync();
-            if (existingUser != null)
-            {
-                throw new Exception("Bu email adresi zaten kullanılıyor.");
-            }
+            if (existingUser != null) throw new Exception("Bu email adresi zaten kullanılıyor.");
 
-            // Ayrıca Username kontrolü de yapmak iyi olur (Opsiyonel ama önerilir)
             var existingUsername = await _userRepository.GetWhere(u => u.Username == request.Username).FirstOrDefaultAsync();
-            if (existingUsername != null)
-            {
-                throw new Exception("Bu kullanıcı adı zaten kullanılıyor.");
-            }
+            if (existingUsername != null) throw new Exception("Bu kullanıcı adı zaten kullanılıyor.");
 
-            // 2. Şifreyi Hash'le (IPasswordHasher kullanıyoruz)
             var passwordHash = _passwordHasher.Generate(request.Password);
 
-            // 3. Yeni kullanıcı nesnesini oluştur
             var newUser = new User
             {
                 Username = request.Username,
                 Email = request.Email,
                 PasswordHash = passwordHash,
-                // PasswordSalt alanına gerek yok, PasswordHasher bunu hallediyor
                 DailyTargetPoints = 100,
                 CreatedDate = DateTime.UtcNow
             };
 
-            // 4. Veritabanına kaydet
             await _userRepository.AddAsync(newUser);
             await _userRepository.SaveAsync();
 
@@ -58,15 +46,12 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<User?> LoginAsync(LoginRequest request)
         {
-            // 1. Kullanıcıyı bul (HEM USERNAME HEM EMAIL KONTROLÜ)
-            // request.UsernameOrEmail değeri veritabanındaki Username YA DA Email ile eşleşiyor mu?
             var user = await _userRepository
                 .GetWhere(u => u.Email == request.UsernameOrEmail || u.Username == request.UsernameOrEmail)
                 .FirstOrDefaultAsync();
 
             if (user == null) return null;
 
-            // 2. Şifreyi doğrula (IPasswordHasher kullanıyoruz)
             bool isPasswordCorrect = _passwordHasher.Verify(request.Password, user.PasswordHash);
 
             if (!isPasswordCorrect) return null;
@@ -76,31 +61,70 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<ServiceResponse<bool>> ChangePasswordAsync(Guid userId, string oldPassword, string newPassword)
         {
-            // 1. Kullanıcıyı Repository üzerinden bul
             var user = await _userRepository.GetWhere(u => u.Id == userId).FirstOrDefaultAsync();
+            if (user == null) return new ServiceResponse<bool> { Success = false, Message = "Kullanıcı bulunamadı." };
 
-            if (user == null)
-            {
-                return new ServiceResponse<bool> { Success = false, Message = "Kullanıcı bulunamadı." };
-            }
-
-            // 2. Mevcut şifreyi kontrol et
             if (!_passwordHasher.Verify(oldPassword, user.PasswordHash))
-            {
                 return new ServiceResponse<bool> { Success = false, Message = "Mevcut şifreniz hatalı." };
-            }
 
-            // 3. Yeni şifreyi hashle
-            var newPasswordHash = _passwordHasher.Generate(newPassword);
-
-            // 4. Kullanıcı bilgilerini güncelle
-            user.PasswordHash = newPasswordHash;
-
-            // 5. Kaydet
+            user.PasswordHash = _passwordHasher.Generate(newPassword);
             _userRepository.Update(user);
             await _userRepository.SaveAsync();
 
             return new ServiceResponse<bool> { Data = true, Message = "Şifre başarıyla değiştirildi." };
+        }
+
+        // --- YENİ METOTLAR ---
+
+        public async Task<ServiceResponse<string>> ForgotPasswordAsync(string email)
+        {
+            var user = await _userRepository.GetWhere(u => u.Email == email).FirstOrDefaultAsync();
+
+            // Güvenlik: Kullanıcı yoksa bile "Yok" dememek daha iyidir ama kullanıcı dostu olması için şimdilik diyoruz.
+            if (user == null) return new ServiceResponse<string> { Success = false, Message = "Kullanıcı bulunamadı." };
+
+            // Token Oluştur (Basit GUID)
+            string resetToken = Guid.NewGuid().ToString();
+
+            // Token'ı kaydet ve 1 saat süre ver
+            user.PasswordResetToken = resetToken;
+            user.PasswordResetTokenExpires = DateTime.UtcNow.AddHours(1);
+
+            _userRepository.Update(user);
+            await _userRepository.SaveAsync();
+
+            // NOT: Gerçek hayatta burada Email servisi çalışır.
+            // Biz testi kolaylaştırmak için Token'ı mesajın içinde dönüyoruz.
+            return new ServiceResponse<string>
+            {
+                Success = true,
+                Message = "Sıfırlama kodu oluşturuldu.",
+                Data = resetToken // Frontend'de yakalayıp test edebilmen için
+            };
+        }
+
+        public async Task<ServiceResponse<bool>> ResetPasswordAsync(string token, string newPassword)
+        {
+            var user = await _userRepository
+                .GetWhere(u => u.PasswordResetToken == token && u.PasswordResetTokenExpires > DateTime.UtcNow)
+                .FirstOrDefaultAsync();
+
+            if (user == null)
+            {
+                return new ServiceResponse<bool> { Success = false, Message = "Geçersiz veya süresi dolmuş kod." };
+            }
+
+            // Yeni şifreyi hashle
+            user.PasswordHash = _passwordHasher.Generate(newPassword);
+
+            // Token'ı temizle (tekrar kullanılamasın)
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpires = null;
+
+            _userRepository.Update(user);
+            await _userRepository.SaveAsync();
+
+            return new ServiceResponse<bool> { Success = true, Message = "Şifreniz başarıyla sıfırlandı." };
         }
     }
 }
