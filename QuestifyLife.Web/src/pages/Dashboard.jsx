@@ -339,7 +339,7 @@ export default function Dashboard() {
                 <header className="bg-white shadow-sm sticky top-0 z-10">
                     <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
                         <div>
-                            <h1 className="text-xl font-bold text-primary tracking-tight">QuestifyLife</h1>
+                            <img src="/public/Logo_Fox_BF.png" alt="Logo" className="w-36 h-15 object-contain" />
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
                                 {isToday ? "Bugün" : format(selectedDate, 'd MMMM', { locale: tr })}
                             </p>

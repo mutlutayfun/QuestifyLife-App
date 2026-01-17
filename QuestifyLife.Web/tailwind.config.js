@@ -8,13 +8,13 @@ export default {
     extend: {
       colors: {
         primary: '#3498db',   // Questify Mavisi
-        secondary: '#2ecc71', // Başarı Yeşili
+        secondary: '#f39c12', // Questify Sarısı
+        success: '#2ecc71',   // Başarı Yeşili
         danger: '#e74c3c',    // Hata Kırmızısı
         dark: '#2c3e50',      // Koyu Tema
         light: '#ecf0f1'      // Açık Zemin
-      }
-    },
-    animation: {
+      },
+      animation: {
         'fade-in-up': 'fadeInUp 0.5s ease-out',
         'bounce-slow': 'bounce 3s infinite',
       },
@@ -24,6 +24,7 @@ export default {
           '100%': { opacity: '1', transform: 'translateY(0)' },
         }
       }
+    },
   },
   plugins: [],
 }

@@ -61,7 +61,7 @@ export default function DailyQuote() {
 
     return (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 rounded-xl shadow-sm mb-6 flex items-start gap-3 animate-fade-in">
-            <span className="text-4xl">💡</span>
+            <img src="/public/Happy_Fox2_BF.png" alt="HappyFox2" className="w-18 h-20 object-contain" />
             <div>
                 <h4 className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">Günün Sözü</h4>
                 <p className="text-gray-700 italic font-medium">"{quote}"</p>

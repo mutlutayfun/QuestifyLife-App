@@ -44,8 +44,18 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
-            <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+            
+            {/* LOGO VE MASKOT ALANI */}
+            <div className="flex flex-col items-center mb-8 animate-fade-in-up">
+                {/* Logo Metni */}
+                <div className="flex items-center gap-2">
+                    <img src="/public/Logo_Fox_BF.png" alt="Logo" className="w-218 h-20 object-contain" />
+                </div>
+                <p className="text-gray-400 text-sm font-medium mt-1">Hayatını oyunlaştır, hedeflerine ulaş.</p>
+            </div>
+
+            <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md animate-fade-in-up delay-100">
                 <h2 className="text-3xl font-bold text-center text-primary mb-6">Giriş Yap</h2>
                 
                 {error && (
