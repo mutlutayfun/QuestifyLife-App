@@ -19,25 +19,24 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<QuestifyLifeDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// --- 2. CORS AYARLARI (Vercel ve Localhost İzni) ---
+// --- 2. CORS AYARLARI (Canlı Siteye İzin Ver) ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins",
         builder =>
         {
             builder.WithOrigins(
-                    "http://localhost:5173",                  // Geliştirme ortamı
-                    "https://questifylifeapp.vercel.app",     // SENİN CANLI SİTEN
-                    "https://questifylifeapp.vercel.app/",     // Slash ile biten versiyonu
-                    "https://questifylife.runasp.net"
+                    "http://localhost:5173",                  // Geliştirme (Senin PC)
+                    "https://questifylifeapp.vercel.app",     // CANLI SİTE 1
+                    "https://questifylifeapp.vercel.app/"     // CANLI SİTE 2 (Slash'lı)
                 )
                 .AllowAnyMethod()
                 .AllowAnyHeader()
-                .AllowCredentials(); // Auth için gerekli
+                .AllowCredentials(); // Cookie/Auth için gerekli
         });
 });
 
-// --- 3. SERVİSLER (Dependency Injection) ---
+// --- 3. SERVİSLER ---
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -88,7 +87,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "JWT Token girmek için: Bearer [boşluk] token"
+        Description = "Token girmek için: Bearer [boşluk] token"
     });
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -103,9 +102,9 @@ builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>()
 
 var app = builder.Build();
 
-// --- 6. MIDDLEWARE ve VERİTABANI OLUŞTURMA ---
+// --- 6. MIDDLEWARE ve VERİTABANI OLUŞTURMA (ÖNEMLİ) ---
 
-// *** KRİTİK: Veritabanı Tablolarını Otomatik Oluştur ***
+// *** SİHİRLİ KOD: Veritabanı Tablolarını Otomatik Oluştur ***
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
