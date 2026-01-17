@@ -11,6 +11,7 @@ import Confetti from 'react-confetti';
 import { toast } from 'react-toastify';
 import { format, addDays, isSameDay } from 'date-fns'; 
 import { tr } from 'date-fns/locale'; 
+import { Link } from 'react-router-dom';
 
 import DailyQuote from '../components/DailyQuote';
 import TutorialModal from '../components/TutorialModal';
@@ -50,6 +51,8 @@ export default function Dashboard() {
 
     const [showTutorial, setShowTutorial] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+    
 
     // YENİ: Bildirimi gönderilen görevlerin ID'lerini tutmak için
     const notifiedQuestsRef = useRef(new Set());
@@ -111,7 +114,33 @@ export default function Dashboard() {
     }, [dashboardData]); // dashboardData değiştikçe listeyi yenile (yeni görev eklendiğinde vs.)
 
     // ... (Kalan kodlar AYNI) ...
-    
+    useEffect(() => {
+        const checkAdminStatus = async () => {
+             // Eğer user objesinde direkt varsa oradan al
+             if (user?.isAdmin || user?.IsAdmin) {
+                 setIsAdmin(true);
+                 return;
+             }
+             
+             try {
+                 const res = await api.get('/User/profile');
+                 const profile = res.data.data || res.data;
+                 
+                 // Backend'den gelen veriye göre admin durumunu set et
+                 // Hem camelCase (isAdmin) hem PascalCase (IsAdmin) kontrolü yapıyoruz
+                 // Böylece JSON serialization formatı ne olursa olsun çalışır
+                 if (profile?.isAdmin === true || profile?.IsAdmin === true) {
+                     setIsAdmin(true);
+                 }
+             } catch (e) {
+                 console.error("Admin check failed", e);
+             }
+        };
+        if (user) {
+            checkAdminStatus();
+        }
+    }, [user]); 
+
     // Tutorial Kontrolü
     useEffect(() => {
         const checkTutorialStatus = async () => {
@@ -345,6 +374,12 @@ export default function Dashboard() {
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
+                            {/* YENİ: Admin Butonu */}
+                            {isAdmin && (
+                                <Link to="/admin" className="text-xs bg-red-100 text-red-600 px-2 py-1.5 rounded-lg font-bold border border-red-200 hover:bg-red-200 transition flex items-center gap-1">
+                                    <span>🛠️</span> <span className="hidden sm:inline">Admin</span>
+                                </Link>
+                            )}
                             <span className="text-sm text-gray-600 font-medium">{user?.username}</span>
                             <button onClick={() => setShowFeedback(true)} className="text-gray-400 hover:text-primary transition" title="Geri Bildirim">📣</button>
                             {isToday && (
@@ -402,9 +437,13 @@ export default function Dashboard() {
 
                     <div className="space-y-2 mt-4">
                         {(!dashboardData?.todayQuests || dashboardData.todayQuests.length === 0) ? (
-                            <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300">
-                                <p>{isToday ? "Henüz bugün için bir görevin yok." : "Bu tarih için planlanmış görev yok."}</p>
-                                <p className="text-sm">Hadi bir tane ekle!</p>
+                            <div className="text-center py-10 px-6 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300 flex flex-col items-center gap-4">
+                                {/* BOŞ DURUM GÖRSELİ */}
+                                <img src="/public/Sad_Fox_BF.png" alt="Waiting Fox" className="w-32 h-32 object-contain opacity-80" />
+                                <div>
+                                    <p className="font-bold text-gray-600">{isToday ? "Henüz bir macera eklemedin!" : "Bu tarih için planlanmış görev yok."}</p>
+                                    <p className="text-sm">Hadi, ilk görevini oluşturarak başla.</p>
+                                </div>
                             </div>
                         ) : (
                             dashboardData.todayQuests.map(quest => (

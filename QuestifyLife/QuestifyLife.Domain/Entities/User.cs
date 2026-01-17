@@ -12,6 +12,7 @@ public class User : BaseEntity
     public string PasswordHash { get; set; } = string.Empty;
     public string? PersonalManifesto { get; set; }
     public string AvatarId { get; set; } = "avatar_1";
+    public bool IsAdmin { get; set; } = false;  
 
     public bool HasSeenTutorial { get; set; } = false;
 

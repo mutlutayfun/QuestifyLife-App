@@ -23,5 +23,6 @@ namespace QuestifyLife.Application.Interfaces
         Task<bool> RemoveAsync(Guid id);
 
         Task<int> SaveAsync();
+        
     }
 }

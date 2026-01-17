@@ -54,6 +54,7 @@ namespace QuestifyLife.Infrastructure.Services
             return new UserProfileDto
             {
                 Username = user.Username,
+                IsAdmin = user.IsAdmin,
                 Email = user.Email,
                 TotalXp = user.TotalXp,
                 CurrentStreak = user.CurrentStreak,

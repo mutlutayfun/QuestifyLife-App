@@ -10,6 +10,7 @@ import History from "./pages/History";
 import Leaderboard from './pages/Leaderboard';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AdminDashboard from './pages/AdminDashboard'; 
 
 // YENİ SAYFALAR VE BİLEŞEN
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -37,6 +38,7 @@ function App() {
 
         <Routes>
           {/* PUBLIC ROTALAR */}
+          <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -51,7 +53,8 @@ function App() {
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
-          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+          
           
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
