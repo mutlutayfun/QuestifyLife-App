@@ -19,17 +19,33 @@ builder.Services.AddDbContext<QuestifyLifeDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // --- 2. CORS AYARLARI (GÜVENLİK GÜNCELLEMESİ) ---
-// Frontend'in çalışacağı adresleri appsettings.json'dan alıyoruz.
-// Eğer ayar yoksa varsayılan olarak tümüne izin verir (Geliştirme sırasındaki hatayı önlemek için)
-var allowedOrigins = builder.Configuration.GetValue<string>("AllowedOrigins")?.Split(",") ?? new string[] { "*" };
+// Not: Canlıya alırken "AllowedOrigins" ayarı appsettings.json'dan gelmezse bile
+// kodun içinde Vercel adresin tanımlı olsun diye burayı güncelliyoruz.
+var allowedOrigins = new List<string>
+{
+    "http://localhost:5173",                  // Yerel Geliştirme (Vite)
+    "https://questifylifeapp.vercel.app",     // CANLI FRONTEND (Vercel)
+    
+};
+
+// appsettings.json'dan gelen ekstralar varsa onları da ekle
+var configOrigins = builder.Configuration.GetValue<string>("AllowedOrigins")?.Split(",");
+if (configOrigins != null)
+{
+    allowedOrigins.AddRange(configOrigins);
+}
+
+// Boşlukları temizle ve benzersiz yap
+var distinctOrigins = allowedOrigins.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CustomCorsPolicy", policy =>
     {
-        policy.WithOrigins(allowedOrigins) // Sadece izin verilen adresler
-              .AllowAnyHeader()            // Her türlü başlığa izin ver
-              .AllowAnyMethod();           // GET, POST, PUT, DELETE vb. izin ver
+        policy.WithOrigins(distinctOrigins) // Sadece senin sitelerine izin ver
+              .AllowAnyHeader()             // Her türlü başlığa izin ver
+              .AllowAnyMethod()             // GET, POST, PUT, DELETE vb. izin ver
+              .AllowCredentials();          // Cookie/Auth bilgilerine izin ver
     });
 });
 
@@ -43,11 +59,14 @@ builder.Services.AddScoped<IFriendService, FriendService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBadgeService, BadgeService>();
+// Admin Paneli Grafikleri için bu servis çok önemli:
 builder.Services.AddScoped<IGenericRepository<DailyPerformance>, GenericRepository<DailyPerformance>>();
 
 // --- 4. JWT AUTHENTICATION AYARLARI ---
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]);
+// Eğer secret key yoksa (dev ortamı hatası için) varsayılan bir değer ata
+var secretKeyString = jwtSettings["SecretKey"] ?? "Bu_Cok_Gizli_Bir_Anahtardir_En_Az_32_Karakter_Olmali_123";
+var secretKey = Encoding.UTF8.GetBytes(secretKeyString);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -62,8 +81,8 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidAudience = jwtSettings["Audience"],
+        ValidIssuer = jwtSettings["Issuer"] ?? "QuestifyLifeAPI",
+        ValidAudience = jwtSettings["Audience"] ?? "QuestifyLifeClient",
         IssuerSigningKey = new SymmetricSecurityKey(secretKey)
     };
 });
@@ -114,12 +133,11 @@ var app = builder.Build();
 // Global Hata Yakalayıcı (En üstte olmalı)
 app.UseMiddleware<QuestifyLife.API.Middlewares.GlobalExceptionMiddleware>();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-else
+// Swagger'ı her ortamda açalım ki MonsterASP üzerinde de test edebilelim
+app.UseSwagger();
+app.UseSwaggerUI();
+
+if (!app.Environment.IsDevelopment())
 {
     // Canlı ortamda HTTP isteklerini HTTPS'e zorla (Güvenlik için kritik)
     app.UseHsts();
@@ -128,7 +146,6 @@ else
 app.UseHttpsRedirection();
 
 // CORS Middleware'i (Authentication'dan ÖNCE olmalı)
-// "AllowAll" yerine yeni güvenli politikamızı kullanıyoruz.
 app.UseCors("CustomCorsPolicy");
 
 app.UseAuthentication();
