@@ -28,7 +28,8 @@ builder.Services.AddCors(options =>
             builder.WithOrigins(
                     "http://localhost:5173",                  // Geliştirme ortamı
                     "https://questifylifeapp.vercel.app",     // SENİN CANLI SİTEN
-                    "https://questifylifeapp.vercel.app/"     // Slash ile biten versiyonu
+                    "https://questifylifeapp.vercel.app/",     // Slash ile biten versiyonu
+                    "https://questifylife.runasp.net"
                 )
                 .AllowAnyMethod()
                 .AllowAnyHeader()
