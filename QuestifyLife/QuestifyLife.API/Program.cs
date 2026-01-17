@@ -19,24 +19,24 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<QuestifyLifeDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// --- 2. CORS AYARLARI (Canlı Siteye İzin Ver) ---
+// --- 2. CORS AYARLARI (Vercel ve Localhost İzni) ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins",
         builder =>
         {
             builder.WithOrigins(
-                    "http://localhost:5173",                  // Geliştirme (Senin PC)
-                    "https://questifylifeapp.vercel.app",     // CANLI SİTE 1
-                    "https://questifylifeapp.vercel.app/"     // CANLI SİTE 2 (Slash'lı)
+                    "http://localhost:5173",                  // Geliştirme ortamı
+                    "https://questifylifeapp.vercel.app",     // SENİN CANLI SİTEN
+                    "https://questifylifeapp.vercel.app/"     // Slash ile biten versiyonu
                 )
                 .AllowAnyMethod()
                 .AllowAnyHeader()
-                .AllowCredentials(); // Cookie/Auth için gerekli
+                .AllowCredentials(); // Auth ve Cookie için gerekli
         });
 });
 
-// --- 3. SERVİSLER ---
+// --- 3. SERVİSLER (Dependency Injection) ---
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -102,7 +102,26 @@ builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>()
 
 var app = builder.Build();
 
-// --- 6. MIDDLEWARE ve VERİTABANI OLUŞTURMA (ÖNEMLİ) ---
+// --- 6. MIDDLEWARE ve SİSTEM KONTROLLERİ ---
+
+// *** TEŞHİS 1: Veritabanı Sağlık Kontrolü ***
+// Bu endpoint sayesinde tarayıcıdan DB bağlantısını test edebileceksin.
+app.MapGet("/api/health", async (QuestifyLifeDbContext db) =>
+{
+    try
+    {
+        await db.Database.CanConnectAsync();
+        return Results.Ok(new { Status = "Healthy", Database = "Connected", Time = DateTime.UtcNow });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, title: "Database Connection Failed");
+    }
+});
+
+// *** TEŞHİS 2: Ana Sayfa Yönlendirmesi ***
+// Siteye direkt girince boş ekran yerine Swagger'a gitsin.
+app.MapGet("/", () => Results.Redirect("/swagger/index.html"));
 
 // *** SİHİRLİ KOD: Veritabanı Tablolarını Otomatik Oluştur ***
 using (var scope = app.Services.CreateScope())
