@@ -1,14 +1,15 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using QuestifyLife.Application.Interfaces;
+using QuestifyLife.Application.Validators;
+using QuestifyLife.Domain.Entities;
 using QuestifyLife.Infrastructure.Persistence.Contexts;
 using QuestifyLife.Infrastructure.Repositories;
 using QuestifyLife.Infrastructure.Services;
-using FluentValidation;
-using FluentValidation.AspNetCore;
-using QuestifyLife.Application.Validators;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,6 +43,7 @@ builder.Services.AddScoped<IFriendService, FriendService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBadgeService, BadgeService>();
+builder.Services.AddScoped<IGenericRepository<DailyPerformance>, GenericRepository<DailyPerformance>>();
 
 // --- 4. JWT AUTHENTICATION AYARLARI ---
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

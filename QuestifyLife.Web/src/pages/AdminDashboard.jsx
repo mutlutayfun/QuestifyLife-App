@@ -3,17 +3,23 @@ import api from "../api/axiosConfig";
 import { toast } from "react-toastify";
 import Layout from "../components/Layout";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { format, subDays, isValid } from "date-fns";
 import { tr } from "date-fns/locale";
+
+// RECHARTS İMPORTLARI
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState(null);
+    const [chartDataState, setChartDataState] = useState({ chartData: [], totalRegister: 0, totalActive: 0 }); 
     const [users, setUsers] = useState([]);
     const [quests, setQuests] = useState([]);
     
-    // YENİ: Filtreleme State'leri
     const [userFilter, setUserFilter] = useState("");
     const [questFilter, setQuestFilter] = useState("");
+
+    const [startDate, setStartDate] = useState(subDays(new Date(), 6)); 
+    const [endDate, setEndDate] = useState(new Date());
 
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("overview"); 
@@ -21,24 +27,66 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchAdminData();
-    }, []);
+    }, [startDate, endDate]);
 
     const fetchAdminData = async () => {
+        if (!startDate || !endDate || !isValid(startDate) || !isValid(endDate)) return;
+
         try {
             setLoading(true);
-            const [statsRes, usersRes, questsRes] = await Promise.all([
+            const [statsRes, chartRes, usersRes, questsRes] = await Promise.all([
                 api.get("/Admin/stats"),
+                api.get(`/Admin/chart-data?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`), 
                 api.get("/Admin/users"),
                 api.get("/Admin/quests")
             ]);
+            
             setStats(statsRes.data);
+
+            // --- GÜVENLİ VERİ İŞLEME BAŞLANGICI ---
+            let rawData = [];
+            let totalReg = 0;
+            let totalAct = 0;
+            const resData = chartRes.data;
+
+            // 1. Veri Yapısını Çözümle (Array mi, Obje mi?)
+            if (Array.isArray(resData)) {
+                // Eğer Backend sadece liste dönüyorsa (Eski yapı)
+                rawData = resData;
+                // Toplamları elle hesapla
+                totalReg = rawData.reduce((acc, cur) => acc + (cur.YeniUye || cur.yeniUye || 0), 0);
+                totalAct = rawData.reduce((acc, cur) => acc + (cur.AktifUye || cur.aktifUye || 0), 0);
+            } else if (resData && (resData.chartData || resData.ChartData)) {
+                // Eğer Backend obje dönüyorsa (Yeni yapı)
+                rawData = resData.chartData || resData.ChartData || [];
+                totalReg = resData.totalRegisterCount || resData.TotalRegisterCount || 0;
+                totalAct = resData.totalActiveUserCount || resData.TotalActiveUserCount || 0;
+            }
+
+            // 2. Veri Anahtarlarını Standartlaştır (Mapping)
+            // Recharts'ın okuyabilmesi için tüm keyleri küçük harfe (camelCase) çeviriyoruz.
+            const standardizedData = rawData.map(item => ({
+                name: item.Name || item.name,        // Grafik X ekseni etiketi (12 Oca)
+                yeniUye: item.YeniUye || item.yeniUye || 0,
+                aktifUye: item.AktifUye || item.aktifUye || 0,
+                date: item.Date || item.date
+            }));
+
+            setChartDataState({
+                chartData: standardizedData,
+                totalRegister: totalReg,
+                totalActive: totalAct
+            });
+            // --- GÜVENLİ VERİ İŞLEME BİTİŞ ---
+
             setUsers(usersRes.data);
             setQuests(questsRes.data);
+
         } catch (error) {
-            console.error(error);
+            console.error("Admin Veri Hatası:", error);
             if (error.response && error.response.status === 401) {
-                toast.error("Yetkisiz giriş!");
-                navigate("/");
+                toast.error("Oturum süreniz dolmuş olabilir.");
+                navigate("/login");
             } else {
                 toast.error("Veriler yüklenirken hata oluştu.");
             }
@@ -63,8 +111,7 @@ export default function AdminDashboard() {
             await api.delete(`/Admin/users/${userId}`);
             toast.success("Silindi.");
             setUsers(users.filter(u => u.id !== userId));
-        } catch (error) 
-        { console.error(error); { toast.error("Hata."); } }
+        } catch { toast.error("Hata."); }
     }
 
     const handleDeleteQuest = async (questId) => {
@@ -73,13 +120,17 @@ export default function AdminDashboard() {
             await api.delete(`/Admin/quests/${questId}`);
             toast.success("Görev kaldırıldı.");
             setQuests(quests.filter(q => q.id !== questId));
-        } catch (error) {
-            console.error(error);
-            toast.error("Hata.");
-        }
+        } catch { toast.error("Hata."); }
     }
 
-    // YENİ: Filtreleme Mantığı
+    const handleDateChange = (dateString, isStart) => {
+        const date = new Date(dateString);
+        if (isValid(date)) {
+            if (isStart) setStartDate(date);
+            else setEndDate(date);
+        }
+    };
+
     const filteredUsers = users.filter(user => 
         user.username.toLowerCase().includes(userFilter.toLowerCase()) ||
         user.email.toLowerCase().includes(userFilter.toLowerCase())
@@ -126,23 +177,87 @@ export default function AdminDashboard() {
                     ))}
                 </div>
 
-                {/* --- SEKME İÇERİKLERİ --- */}
-
                 {/* 1. GENEL BAKIŞ */}
                 {activeTab === "overview" && stats && (
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 animate-fade-in">
-                        <StatCard label="Toplam Kullanıcı" value={stats.totalUsers} color="bg-blue-50 text-blue-600 border-blue-100" />
-                        <StatCard label="Toplam Görev" value={stats.totalQuests} color="bg-orange-50 text-orange-600 border-orange-100" />
-                        <StatCard label="Dağıtılan Rozet" value={stats.totalBadges} color="bg-yellow-50 text-yellow-600 border-yellow-100" />
-                        <StatCard label="Tamamlanma Oranı" value={`%${stats.activeRatio}`} color="bg-green-50 text-green-600 border-green-100" />
-                        <StatCard label="Toplam Sistem XP" value={stats.totalSystemXp.toLocaleString()} color="bg-purple-50 text-purple-600 border-purple-100" span="col-span-2 md:col-span-1" />
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <StatCard label="Toplam Kullanıcı" value={stats.totalUsers} color="bg-blue-50 text-blue-600 border-blue-100" />
+                            <StatCard label="Toplam Görev" value={stats.totalQuests} color="bg-orange-50 text-orange-600 border-orange-100" />
+                            <StatCard label="Dağıtılan Rozet" value={stats.totalBadges} color="bg-yellow-50 text-yellow-600 border-yellow-100" />
+                            <StatCard label="Tamamlanma Oranı" value={`%${stats.activeRatio}`} color="bg-green-50 text-green-600 border-green-100" />
+                            <StatCard label="Toplam Sistem XP" value={stats.totalSystemXp.toLocaleString()} color="bg-purple-50 text-purple-600 border-purple-100" span="col-span-2 md:col-span-1" />
+                        </div>
+
+                        {/* GRAFİK ALANI */}
+                        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                                <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
+                                    📈 Aktivite Grafiği
+                                </h3>
+                                
+                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200">
+                                    <input 
+                                        type="date" 
+                                        value={isValid(startDate) ? format(startDate, 'yyyy-MM-dd') : ''}
+                                        onChange={(e) => handleDateChange(e.target.value, true)}
+                                        className="bg-transparent text-sm font-bold text-gray-600 outline-none cursor-pointer"
+                                    />
+                                    <span className="text-gray-400 text-xs font-bold">ARGS</span>
+                                    <input 
+                                        type="date" 
+                                        value={isValid(endDate) ? format(endDate, 'yyyy-MM-dd') : ''}
+                                        onChange={(e) => handleDateChange(e.target.value, false)}
+                                        className="bg-transparent text-sm font-bold text-gray-600 outline-none cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mb-4">
+                                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                    <span className="text-xs font-bold text-blue-700">Toplam Aktif: {chartDataState.totalActive}</span>
+                                </div>
+                                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-100">
+                                    <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                                    <span className="text-xs font-bold text-orange-700">Toplam Yeni: {chartDataState.totalRegister}</span>
+                                </div>
+                            </div>
+
+                            <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart
+                                        data={chartDataState.chartData}
+                                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                                    >
+                                        <defs>
+                                            <linearGradient id="colorAktif" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3498db" stopOpacity={0.8}/>
+                                                <stop offset="95%" stopColor="#3498db" stopOpacity={0}/>
+                                            </linearGradient>
+                                            <linearGradient id="colorYeni" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#f39c12" stopOpacity={0.8}/>
+                                                <stop offset="95%" stopColor="#f39c12" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                                        <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                        <Tooltip 
+                                            contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                            itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                                        />
+                                        <Area type="monotone" dataKey="aktifUye" name="Aktif Kullanıcı" stroke="#3498db" fillOpacity={1} fill="url(#colorAktif)" strokeWidth={3} />
+                                        <Area type="monotone" dataKey="yeniUye" name="Yeni Kayıt" stroke="#f39c12" fillOpacity={1} fill="url(#colorYeni)" strokeWidth={3} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* 2. KULLANICILAR */}
                 {activeTab === "users" && (
                     <div className="animate-fade-in">
-                        {/* YENİ: Arama Kutusu */}
                         <div className="mb-4 relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                             <input 
@@ -204,7 +319,6 @@ export default function AdminDashboard() {
                 {/* 3. GÖREVLER */}
                 {activeTab === "quests" && (
                     <div className="animate-fade-in">
-                        {/* YENİ: Arama Kutusu */}
                         <div className="mb-4 relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                             <input 

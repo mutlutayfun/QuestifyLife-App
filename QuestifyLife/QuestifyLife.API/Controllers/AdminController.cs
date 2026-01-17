@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuestifyLife.Application.Interfaces;
 using QuestifyLife.Domain.Entities;
+using System.Globalization;
 using System.Security.Claims;
 
 namespace QuestifyLife.API.Controllers
@@ -15,15 +16,19 @@ namespace QuestifyLife.API.Controllers
         private readonly IGenericRepository<User> _userRepository;
         private readonly IGenericRepository<Quest> _questRepository;
         private readonly IGenericRepository<Badge> _badgeRepository;
+        private readonly IGenericRepository<DailyPerformance> _dailyPerformanceRepository;
 
+        // Constructor'da tüm nesnelerin parametre olarak geldiğinden emin ol:
         public AdminController(
             IGenericRepository<User> userRepository,
             IGenericRepository<Quest> questRepository,
-            IGenericRepository<Badge> badgeRepository)
+            IGenericRepository<Badge> badgeRepository,
+            IGenericRepository<DailyPerformance> dailyPerformanceRepository) // <- Burası önemli
         {
             _userRepository = userRepository;
             _questRepository = questRepository;
             _badgeRepository = badgeRepository;
+            _dailyPerformanceRepository = dailyPerformanceRepository;
         }
 
         private async Task<bool> IsUserAdmin()
@@ -56,6 +61,58 @@ namespace QuestifyLife.API.Controllers
                 ActiveRatio = totalQuests > 0 ? (completedQuests * 100 / totalQuests) : 0,
                 TotalBadges = totalBadgesAwarded,
                 TotalSystemXp = totalSystemXp
+            });
+        }
+        [HttpGet("chart-data")]
+        public async Task<IActionResult> GetChartData([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+        {
+            if (!await IsUserAdmin()) return Unauthorized("Erişim reddedildi.");
+
+            // Varsayılan olarak son 7 gün
+            DateTime start = startDate?.Date ?? DateTime.UtcNow.Date.AddDays(-6);
+            DateTime end = endDate?.Date ?? DateTime.UtcNow.Date;
+
+            // Tarih aralığındaki gün sayısını hesapla
+            int dayCount = (end - start).Days + 1;
+
+            // Günleri oluştur
+            var daysInRange = Enumerable.Range(0, dayCount)
+                .Select(i => start.AddDays(i))
+                .ToList();
+
+            var chartData = new List<object>();
+            int totalRegisterCount = 0;
+            int totalActiveUserCount = 0;
+
+            foreach (var date in daysInRange)
+            {
+                // O gün kayıt olanlar
+                var registerCount = await _userRepository
+                    .GetWhere(u => u.CreatedDate.Date == date)
+                    .CountAsync();
+
+                // O gün aktif olanlar (DailyPerformance kaydı olanlar)
+                var activeUserCount = await _dailyPerformanceRepository
+                    .GetWhere(dp => dp.Date.Date == date)
+                    .CountAsync();
+
+                totalRegisterCount += registerCount;
+                totalActiveUserCount += activeUserCount;
+
+                chartData.Add(new
+                {
+                    Name = date.ToString("dd MMM", new CultureInfo("tr-TR")), // Gün Ay (örn: 12 Oca)
+                    YeniUye = registerCount,
+                    AktifUye = activeUserCount,
+                    Date = date // Frontend'de kullanmak için tam tarih
+                });
+            }
+
+            return Ok(new
+            {
+                ChartData = chartData,
+                TotalRegisterCount = totalRegisterCount,
+                TotalActiveUserCount = totalActiveUserCount
             });
         }
 
