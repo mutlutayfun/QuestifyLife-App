@@ -19,24 +19,34 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<QuestifyLifeDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// --- 2. CORS AYARLARI (Vercel ve Localhost İzni) ---
+// --- 2. CORS AYARLARI (Dinamik ve Esnek Yapı) ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins",
-        builder =>
+        corsBuilder =>
         {
-            builder.WithOrigins(
-                    "http://localhost:5173",                  // Geliştirme ortamı
-                    "https://questifylifeapp.vercel.app",     // SENİN CANLI SİTEN
-                    "https://questifylifeapp.vercel.app/"     // Slash ile biten versiyonu
-                )
+            corsBuilder.SetIsOriginAllowed(origin =>
+            {
+                // 1. Localhost adreslerine izin ver
+                if (origin.StartsWith("http://localhost")) return true;
+
+                // 2. Ana Canlı Siteye izin ver
+                if (origin == "https://questifylifeapp.vercel.app") return true;
+                if (origin == "https://www.questifylifeapp.vercel.app") return true;
+
+                // 3. KRİTİK DÜZELTME: Vercel Preview (Önizleme) URL'lerine izin ver
+                // Senin hatanı çözen satır burasıdır. Sonu .vercel.app ile biten her şeye izin verir.
+                if (origin.EndsWith(".vercel.app")) return true;
+
+                return false;
+            })
                 .AllowAnyMethod()
                 .AllowAnyHeader()
-                .AllowCredentials(); // Auth ve Cookie için gerekli
+                .AllowCredentials(); // Auth işlemleri için zorunlu
         });
 });
 
-// --- 3. SERVİSLER (Dependency Injection) ---
+// --- 3. SERVİSLER ---
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -50,7 +60,6 @@ builder.Services.AddScoped<IGenericRepository<DailyPerformance>, GenericReposito
 
 // --- 4. JWT AUTHENTICATION ---
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-// Eğer secret key yoksa (hata almamak için) varsayılan bir key ata
 var secretKeyString = jwtSettings["SecretKey"] ?? "QuestifyLife_Super_Secret_Key_For_Safety_2024!";
 var secretKey = Encoding.UTF8.GetBytes(secretKeyString);
 
@@ -87,7 +96,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Token girmek için: Bearer [boşluk] token"
+        Description = "Token: Bearer [boşluk] token"
     });
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -102,10 +111,8 @@ builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>()
 
 var app = builder.Build();
 
-// --- 6. MIDDLEWARE ve SİSTEM KONTROLLERİ ---
+// --- 6. MIDDLEWARE ---
 
-// *** TEŞHİS 1: Veritabanı Sağlık Kontrolü ***
-// Bu endpoint sayesinde tarayıcıdan DB bağlantısını test edebileceksin.
 app.MapGet("/api/health", async (QuestifyLifeDbContext db) =>
 {
     try
@@ -115,39 +122,36 @@ app.MapGet("/api/health", async (QuestifyLifeDbContext db) =>
     }
     catch (Exception ex)
     {
-        return Results.Problem(detail: ex.Message, title: "Database Connection Failed");
+        return Results.Json(new { Status = "Unhealthy", Error = ex.Message }, statusCode: 500);
     }
 });
 
-// *** TEŞHİS 2: Ana Sayfa Yönlendirmesi ***
-// Siteye direkt girince boş ekran yerine Swagger'a gitsin.
 app.MapGet("/", () => Results.Redirect("/swagger/index.html"));
 
-// *** SİHİRLİ KOD: Veritabanı Tablolarını Otomatik Oluştur ***
+// Veritabanı Migration İşlemi
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     try
     {
         var context = services.GetRequiredService<QuestifyLifeDbContext>();
-        context.Database.EnsureCreated(); // Tablolar yoksa oluşturur!
+        context.Database.Migrate();
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Veritabanı oluşturulurken hata meydana geldi.");
+        logger.LogError(ex, "Veritabanı migration hatası.");
     }
 }
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
-// Swagger'ı her zaman açık tut (Canlıda test için)
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
-// CORS'u aktif et (Auth'dan önce olmalı)
+// CORS Middleware (Auth'dan önce çalışmalı)
 app.UseCors("AllowSpecificOrigins");
 
 app.UseAuthentication();
