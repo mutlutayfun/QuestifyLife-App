@@ -368,7 +368,7 @@ export default function Dashboard() {
                 <header className="bg-white shadow-sm sticky top-0 z-10">
                     <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
                         <div>
-                            <img src="/public/Logo_Fox_BF.png" alt="Logo" className="w-36 h-15 object-contain" />
+                            <img src="/Logo_Fox_BF.png" alt="Logo" className="w-36 h-15 object-contain" />
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
                                 {isToday ? "Bugün" : format(selectedDate, 'd MMMM', { locale: tr })}
                             </p>
@@ -439,7 +439,7 @@ export default function Dashboard() {
                         {(!dashboardData?.todayQuests || dashboardData.todayQuests.length === 0) ? (
                             <div className="text-center py-10 px-6 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300 flex flex-col items-center gap-4">
                                 {/* BOŞ DURUM GÖRSELİ */}
-                                <img src="/public/Sad_Fox_BF.png" alt="Waiting Fox" className="w-32 h-32 object-contain opacity-80" />
+                                <img src="/Sad_Fox_BF.png" alt="Waiting Fox" className="w-32 h-32 object-contain opacity-80" />
                                 <div>
                                     <p className="font-bold text-gray-600">{isToday ? "Henüz bir macera eklemedin!" : "Bu tarih için planlanmış görev yok."}</p>
                                     <p className="text-sm">Hadi, ilk görevini oluşturarak başla.</p>

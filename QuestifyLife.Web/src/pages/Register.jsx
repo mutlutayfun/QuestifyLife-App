@@ -61,7 +61,7 @@ export default function Register() {
             <div className="flex flex-col items-center mb-8 animate-fade-in-up">
                 {/* Maskot */}
                 <img 
-                    src="/public/Happy_Fox_BF.png" 
+                    src="/Happy_Fox_BF.png" 
                     alt="Questify Fox" 
                     className="w-32 h-32 object-contain mb-4 drop-shadow-xl" 
                 />

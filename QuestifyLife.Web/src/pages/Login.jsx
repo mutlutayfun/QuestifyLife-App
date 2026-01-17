@@ -50,7 +50,7 @@ export default function Login() {
             <div className="flex flex-col items-center mb-8 animate-fade-in-up">
                 {/* Logo Metni */}
                 <div className="flex items-center gap-2">
-                    <img src="/public/Logo_Fox_BF.png" alt="Logo" className="w-218 h-20 object-contain" />
+                    <img src="/Logo_Fox_BF.png" alt="Logo" className="w-218 h-20 object-contain" />
                 </div>
                 <p className="text-gray-400 text-sm font-medium mt-1">Hayatını oyunlaştır, hedeflerine ulaş.</p>
             </div>
