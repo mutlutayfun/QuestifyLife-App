@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using QuestifyLife.API.Middlewares;
 using QuestifyLife.Application.Interfaces;
 using QuestifyLife.Application.Validators;
 using QuestifyLife.Domain.Entities;
@@ -18,40 +19,24 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<QuestifyLifeDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// --- 2. CORS AYARLARI (GÜVENLİK GÜNCELLEMESİ) ---
-// Not: Canlıya alırken "AllowedOrigins" ayarı appsettings.json'dan gelmezse bile
-// kodun içinde Vercel adresin tanımlı olsun diye burayı güncelliyoruz.
-var allowedOrigins = new List<string>
-{
-    "http://localhost:5173",                  // Yerel Geliştirme (Vite)
-    "https://questifylifeapp.vercel.app",
-    "https://questifylifeapp.vercel.app/",      // CANLI FRONTEND (Vercel)
-    "https://questifylife.runasp.net",
-    "https://questifylife.runasp.net/"          // CANLI FRONTEND (MonsterASP)"
-};
-
-// appsettings.json'dan gelen ekstralar varsa onları da ekle
-var configOrigins = builder.Configuration.GetValue<string>("AllowedOrigins")?.Split(",");
-if (configOrigins != null)
-{
-    allowedOrigins.AddRange(configOrigins);
-}
-
-// Tekrarları temizle
-var distinctOrigins = allowedOrigins.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
-
+// --- 2. CORS AYARLARI (Vercel ve Localhost İzni) ---
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CustomCorsPolicy", policy =>
-    {
-        policy.WithOrigins(distinctOrigins) // Sadece izinli siteler
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();          // Auth işlemleri için gerekli
-    });
+    options.AddPolicy("AllowSpecificOrigins",
+        builder =>
+        {
+            builder.WithOrigins(
+                    "http://localhost:5173",                  // Geliştirme ortamı
+                    "https://questifylifeapp.vercel.app",     // SENİN CANLI SİTEN
+                    "https://questifylifeapp.vercel.app/"     // Slash ile biten versiyonu
+                )
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials(); // Auth için gerekli
+        });
 });
 
-// --- 3. SERVİSLERİN ENJEKTE EDİLMESİ (IoC Container) ---
+// --- 3. SERVİSLER (Dependency Injection) ---
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -61,13 +46,12 @@ builder.Services.AddScoped<IFriendService, FriendService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBadgeService, BadgeService>();
-// Admin Paneli Grafikleri için gerekli:
 builder.Services.AddScoped<IGenericRepository<DailyPerformance>, GenericRepository<DailyPerformance>>();
 
-// --- 4. JWT AUTHENTICATION AYARLARI ---
+// --- 4. JWT AUTHENTICATION ---
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-// Hata almamak için varsayılan bir key atıyoruz (Production'da appsettings.json'dan gelmeli)
-var secretKeyString = jwtSettings["SecretKey"] ?? "QuestifyLife_Secret_Key_For_Dev_Environment_12345";
+// Eğer secret key yoksa (hata almamak için) varsayılan bir key ata
+var secretKeyString = jwtSettings["SecretKey"] ?? "QuestifyLife_Super_Secret_Key_For_Safety_2024!";
 var secretKey = Encoding.UTF8.GetBytes(secretKeyString);
 
 builder.Services.AddAuthentication(options =>
@@ -83,15 +67,15 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings["Issuer"] ?? "QuestifyLifeAPI",
-        ValidAudience = jwtSettings["Audience"] ?? "QuestifyLifeClient",
+        ValidIssuer = jwtSettings["Issuer"] ?? "QuestifyLife.API",
+        ValidAudience = jwtSettings["Audience"] ?? "QuestifyLife.App",
         IssuerSigningKey = new SymmetricSecurityKey(secretKey)
     };
 });
 
 builder.Services.AddControllers();
 
-// --- 5. SWAGGER (API Dokümantasyonu) ---
+// --- 5. SWAGGER ---
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -103,17 +87,11 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "JWT ile giriş yapmak için: 'Bearer' yazıp boşluk bırakın ve token'ı yapıştırın. Örn: \"Bearer eyJhb...\""
+        Description = "JWT Token girmek için: Bearer [boşluk] token"
     });
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            new string[] {}
-        }
+        { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } }, new string[] {} }
     });
 });
 
@@ -124,26 +102,34 @@ builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>()
 
 var app = builder.Build();
 
-// --- 6. MIDDLEWARE PIPELINE ---
+// --- 6. MIDDLEWARE ve VERİTABANI OLUŞTURMA ---
 
-app.UseMiddleware<QuestifyLife.API.Middlewares.GlobalExceptionMiddleware>();
+// *** KRİTİK: Veritabanı Tablolarını Otomatik Oluştur ***
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<QuestifyLifeDbContext>();
+        context.Database.EnsureCreated(); // Tablolar yoksa oluşturur!
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Veritabanı oluşturulurken hata meydana geldi.");
+    }
+}
 
-// *** DÜZELTME: Swagger'ı Her Ortamda Aç ***
-// Artık "if (IsDevelopment)" bloğunun dışında, yani MonsterASP'de de görünecek.
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// Swagger'ı her zaman açık tut (Canlıda test için)
 app.UseSwagger();
 app.UseSwaggerUI();
 
-if (!app.Environment.IsDevelopment())
-{
-    // Canlı ortamda güvenliği artırır
-    app.UseHsts();
-}
-
-// HTTPS Yönlendirmesi (MonsterASP'de SSL varsa açık kalsın)
 app.UseHttpsRedirection();
 
-// CORS Middleware'i (Authentication'dan ÖNCE olmalı)
-app.UseCors("CustomCorsPolicy");
+// CORS'u aktif et (Auth'dan önce olmalı)
+app.UseCors("AllowSpecificOrigins");
 
 app.UseAuthentication();
 app.UseAuthorization();
