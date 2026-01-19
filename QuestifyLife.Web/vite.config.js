@@ -15,12 +15,12 @@ export default defineConfig({
         theme_color: '#3498db',
         icons: [
           {
-            src: '/pwa-192x192.png', // Bu ikonları public klasörüne koymalısın
+            src: '/Happy_Fox_BF.png', // Bu ikonları public klasörüne koymalısın
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: '/Happy_Fox_BF.png',
             sizes: '512x512',
             type: 'image/png'
           }

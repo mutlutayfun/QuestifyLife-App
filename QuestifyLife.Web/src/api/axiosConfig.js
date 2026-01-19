@@ -3,7 +3,8 @@ import axios from "axios";
 // BURASI ÇOK ÖNEMLİ:
 // Vercel ayarı varsa onu kullan, yoksa direkt senin CANLI BACKEND adresini kullan.
 // Böylece ayar yapmayı unutsan bile çalışır.
-const baseURL = import.meta.env.VITE_API_URL || "https://questifylife.runasp.net/api";
+//const baseURL = import.meta.env.VITE_API_URL || "https://questifylife.runasp.net/api";
+const baseURL = import.meta.env.VITE_API_URL || "https://localhost:7090/api";
 
 const api = axios.create({
     baseURL: baseURL,

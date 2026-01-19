@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using QuestifyLife.API.Middlewares;
+using QuestifyLife.API.Middlewares; // Namespace'i kontrol et
 using QuestifyLife.Application.Interfaces;
 using QuestifyLife.Application.Validators;
 using QuestifyLife.Domain.Entities;
@@ -15,11 +15,21 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- 1. VERİTABANI BAĞLANTISI ---
+// --- 1. VERİTABANI BAĞLANTISI (GÜÇLENDİRİLMİŞ) ---
+// Hata logunda önerilen "EnableRetryOnFailure" özelliğini ekledik.
+// Bu sayede anlık internet kopmalarında hemen hata vermez, tekrar dener.
 builder.Services.AddDbContext<QuestifyLifeDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlServerOptionsAction: sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,               // 5 kere tekrar dene
+                maxRetryDelay: TimeSpan.FromSeconds(30), // Her deneme arası bekle
+                errorNumbersToAdd: null);
+        }));
 
-// --- 2. CORS AYARLARI (Dinamik ve Esnek Yapı) ---
+// --- 2. CORS AYARLARI ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins",
@@ -27,22 +37,15 @@ builder.Services.AddCors(options =>
         {
             corsBuilder.SetIsOriginAllowed(origin =>
             {
-                // 1. Localhost adreslerine izin ver
                 if (origin.StartsWith("http://localhost")) return true;
-
-                // 2. Ana Canlı Siteye izin ver
                 if (origin == "https://questifylifeapp.vercel.app") return true;
                 if (origin == "https://www.questifylifeapp.vercel.app") return true;
-
-                // 3. KRİTİK DÜZELTME: Vercel Preview (Önizleme) URL'lerine izin ver
-                // Senin hatanı çözen satır burasıdır. Sonu .vercel.app ile biten her şeye izin verir.
                 if (origin.EndsWith(".vercel.app")) return true;
-
                 return false;
             })
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials(); // Auth işlemleri için zorunlu
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
         });
 });
 
@@ -60,7 +63,12 @@ builder.Services.AddScoped<IGenericRepository<DailyPerformance>, GenericReposito
 
 // --- 4. JWT AUTHENTICATION ---
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKeyString = jwtSettings["SecretKey"] ?? "QuestifyLife_Super_Secret_Key_For_Safety_2024!";
+var secretKeyString = jwtSettings["SecretKey"];
+// Eğer SecretKey okunamazsa yedek anahtarı kullan (Çökme Önleyici)
+if (string.IsNullOrEmpty(secretKeyString))
+{
+    secretKeyString = "QuestifyLife_Super_Secret_Key_For_Safety_2024!";
+}
 var secretKey = Encoding.UTF8.GetBytes(secretKeyString);
 
 builder.Services.AddAuthentication(options =>
@@ -104,7 +112,6 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
 builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
@@ -113,6 +120,12 @@ var app = builder.Build();
 
 // --- 6. MIDDLEWARE ---
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
+// Health Check
 app.MapGet("/api/health", async (QuestifyLifeDbContext db) =>
 {
     try
@@ -128,7 +141,7 @@ app.MapGet("/api/health", async (QuestifyLifeDbContext db) =>
 
 app.MapGet("/", () => Results.Redirect("/swagger/index.html"));
 
-// Veritabanı Migration İşlemi
+// Migration
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -150,13 +163,9 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
-
-// CORS Middleware (Auth'dan önce çalışmalı)
 app.UseCors("AllowSpecificOrigins");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
