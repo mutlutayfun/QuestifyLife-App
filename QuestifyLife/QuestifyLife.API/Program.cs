@@ -134,13 +134,21 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     try
     {
+        // 1. Veritabanını güncelle (Yoksa oluşturur)
         var context = services.GetRequiredService<QuestifyLifeDbContext>();
         context.Database.Migrate();
+
+        // 2. Rozetleri yükle (Eğer tablo boşsa varsayılanları basar)
+        var badgeService = services.GetRequiredService<IBadgeService>();
+        await badgeService.SeedBadgesAsync();
+
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Veritabanı hazırlandı ve rozet tanımları yüklendi.");
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Veritabanı migration hatası.");
+        logger.LogError(ex, "Veritabanı başlatılırken hata oluştu.");
     }
 }
 

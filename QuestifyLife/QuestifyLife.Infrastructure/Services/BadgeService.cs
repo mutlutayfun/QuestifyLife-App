@@ -159,6 +159,7 @@ namespace QuestifyLife.Infrastructure.Services
                 .OrderByDescending(b => b.IsEarned)
                 .ThenByDescending(b => b.Rarity == "legendary")
                 .ThenByDescending(b => b.Rarity == "epic")
+                .ThenByDescending(b => b.Rarity == "rare")
                 .ToList();
         }
     }
