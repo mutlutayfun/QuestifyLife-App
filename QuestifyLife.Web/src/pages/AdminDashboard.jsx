@@ -15,6 +15,13 @@ export default function AdminDashboard() {
     const [users, setUsers] = useState([]);
     const [quests, setQuests] = useState([]);
     
+    // YENİ: Feedback State'leri
+    const [feedbacks, setFeedbacks] = useState([]);
+    const [replyModalOpen, setReplyModalOpen] = useState(false);
+    const [selectedFeedback, setSelectedFeedback] = useState(null);
+    const [replyMessage, setReplyMessage] = useState("");
+    const [sendingReply, setSendingReply] = useState(false);
+    
     const [userFilter, setUserFilter] = useState("");
     const [questFilter, setQuestFilter] = useState("");
 
@@ -28,6 +35,13 @@ export default function AdminDashboard() {
     useEffect(() => {
         fetchAdminData();
     }, [startDate, endDate]);
+
+    // Feedbacks sekmesine geçince veriyi çek (Lazy load gibi)
+    useEffect(() => {
+        if (activeTab === "feedbacks" && feedbacks.length === 0) {
+            fetchFeedbacks();
+        }
+    }, [activeTab]);
 
     const fetchAdminData = async () => {
         if (!startDate || !endDate || !isValid(startDate) || !isValid(endDate)) return;
@@ -43,30 +57,24 @@ export default function AdminDashboard() {
             
             setStats(statsRes.data);
 
-            // --- GÜVENLİ VERİ İŞLEME BAŞLANGICI ---
+            // --- GÜVENLİ VERİ İŞLEME ---
             let rawData = [];
             let totalReg = 0;
             let totalAct = 0;
             const resData = chartRes.data;
 
-            // 1. Veri Yapısını Çözümle (Array mi, Obje mi?)
             if (Array.isArray(resData)) {
-                // Eğer Backend sadece liste dönüyorsa (Eski yapı)
                 rawData = resData;
-                // Toplamları elle hesapla
                 totalReg = rawData.reduce((acc, cur) => acc + (cur.YeniUye || cur.yeniUye || 0), 0);
                 totalAct = rawData.reduce((acc, cur) => acc + (cur.AktifUye || cur.aktifUye || 0), 0);
             } else if (resData && (resData.chartData || resData.ChartData)) {
-                // Eğer Backend obje dönüyorsa (Yeni yapı)
                 rawData = resData.chartData || resData.ChartData || [];
                 totalReg = resData.totalRegisterCount || resData.TotalRegisterCount || 0;
                 totalAct = resData.totalActiveUserCount || resData.TotalActiveUserCount || 0;
             }
 
-            // 2. Veri Anahtarlarını Standartlaştır (Mapping)
-            // Recharts'ın okuyabilmesi için tüm keyleri küçük harfe (camelCase) çeviriyoruz.
             const standardizedData = rawData.map(item => ({
-                name: item.Name || item.name,        // Grafik X ekseni etiketi (12 Oca)
+                name: item.Name || item.name,
                 yeniUye: item.YeniUye || item.yeniUye || 0,
                 aktifUye: item.AktifUye || item.aktifUye || 0,
                 date: item.Date || item.date
@@ -77,7 +85,6 @@ export default function AdminDashboard() {
                 totalRegister: totalReg,
                 totalActive: totalAct
             });
-            // --- GÜVENLİ VERİ İŞLEME BİTİŞ ---
 
             setUsers(usersRes.data);
             setQuests(questsRes.data);
@@ -92,6 +99,17 @@ export default function AdminDashboard() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    // YENİ: Feedbackleri Çek
+    const fetchFeedbacks = async () => {
+        try {
+            const res = await api.get("/Feedback/admin/all");
+            setFeedbacks(res.data);
+        } catch (error) {
+            console.error("Feedback hatası:", error);
+            toast.error("Geri bildirimler alınamadı.");
         }
     };
 
@@ -122,6 +140,39 @@ export default function AdminDashboard() {
             setQuests(quests.filter(q => q.id !== questId));
         } catch { toast.error("Hata."); }
     }
+
+    // YENİ: Cevaplama İşlemi
+    const openReplyModal = (feedback) => {
+        setSelectedFeedback(feedback);
+        setReplyMessage("");
+        setReplyModalOpen(true);
+    };
+
+    const handleSendReply = async (e) => {
+        e.preventDefault();
+        if (!replyMessage.trim()) return;
+
+        setSendingReply(true);
+        try {
+            await api.post("/Feedback/admin/reply", {
+                feedbackId: selectedFeedback.id,
+                replyMessage: replyMessage
+            });
+            toast.success("Cevap gönderildi! 📧");
+            
+            // Listeyi güncelle (İncelendi yap)
+            setFeedbacks(feedbacks.map(f => 
+                f.id === selectedFeedback.id ? { ...f, isReviewed: true } : f
+            ));
+            
+            setReplyModalOpen(false);
+        } catch (error) {
+            console.error(error);
+            toast.error("Cevap gönderilemedi.");
+        } finally {
+            setSendingReply(false);
+        }
+    };
 
     const handleDateChange = (dateString, isStart) => {
         const date = new Date(dateString);
@@ -156,14 +207,14 @@ export default function AdminDashboard() {
                         </h1>
                         <p className="text-gray-500 text-sm font-medium mt-1">Sistemin genel durumunu izle ve yönet.</p>
                     </div>
-                    <button onClick={fetchAdminData} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-4 py-2 rounded-xl transition flex items-center justify-center gap-2">
+                    <button onClick={() => { fetchAdminData(); if(activeTab === 'feedbacks') fetchFeedbacks(); }} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-4 py-2 rounded-xl transition flex items-center justify-center gap-2">
                         🔄 Yenile
                     </button>
                 </div>
 
                 {/* Sekmeler */}
                 <div className="flex gap-2 p-1 bg-gray-100 rounded-xl mb-8 overflow-x-auto">
-                    {["overview", "users", "quests"].map((tab) => (
+                    {["overview", "users", "quests", "feedbacks"].map((tab) => (
                         <button 
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -173,6 +224,7 @@ export default function AdminDashboard() {
                             {tab === "overview" && "📊 Genel Bakış"}
                             {tab === "users" && "👥 Kullanıcılar"}
                             {tab === "quests" && "📝 Görev Akışı"}
+                            {tab === "feedbacks" && "💬 Geri Bildirimler"}
                         </button>
                     ))}
                 </div>
@@ -377,7 +429,117 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 )}
+
+                {/* 4. GERİ BİLDİRİMLER (YENİ SEKME) */}
+                {activeTab === "feedbacks" && (
+                    <div className="animate-fade-in">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse min-w-[600px]">
+                                <thead>
+                                    <tr className="text-xs text-gray-400 border-b-2 border-gray-100">
+                                        <th className="py-3 pl-2">Gönderen</th>
+                                        <th className="py-3">Konu & Puan</th>
+                                        <th className="py-3 w-1/3">Mesaj</th>
+                                        <th className="py-3 text-right pr-2">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-sm">
+                                    {feedbacks.length > 0 ? feedbacks.map(feed => (
+                                        <tr key={feed.id} className={`border-b border-gray-50 transition group ${feed.isReviewed ? 'bg-gray-50/50' : 'bg-white hover:bg-gray-50'}`}>
+                                            <td className="py-3 pl-2 align-top">
+                                                <div className="font-bold text-gray-800">{feed.username}</div>
+                                                <div className="text-xs text-gray-400">{format(new Date(feed.createdDate), "d MMM yyyy", { locale: tr })}</div>
+                                            </td>
+                                            <td className="py-3 align-top">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-bold text-primary text-xs bg-blue-50 px-2 py-0.5 rounded">{feed.subject}</span>
+                                                </div>
+                                                <div className="text-yellow-400 text-xs">
+                                                    {'★'.repeat(feed.rating)}{'☆'.repeat(5 - feed.rating)}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 align-top">
+                                                <div className="text-gray-600 text-sm whitespace-pre-wrap">{feed.message}</div>
+                                                {feed.isReviewed && (
+                                                    <span className="inline-block mt-2 text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
+                                                        ✓ İncelendi
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="py-3 text-right pr-2 align-top">
+                                                {!feed.isReviewed ? (
+                                                    <button 
+                                                        onClick={() => openReplyModal(feed)}
+                                                        className="px-3 py-1.5 bg-primary text-white hover:bg-blue-600 rounded-lg text-xs font-bold transition shadow-sm"
+                                                    >
+                                                        ↩️ Cevapla
+                                                    </button>
+                                                ) : (
+                                                    <button disabled className="px-3 py-1.5 text-gray-400 cursor-not-allowed text-xs font-bold">
+                                                        Cevaplandı
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr>
+                                            <td colSpan="4" className="text-center py-8 text-gray-400 italic">Henüz geri bildirim yok.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* CEVAPLAMA MODALI */}
+            {replyModalOpen && selectedFeedback && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-fade-in" onClick={() => setReplyModalOpen(false)}>
+                    <div 
+                        className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl relative"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <button onClick={() => setReplyModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">✕</button>
+
+                        <h3 className="text-xl font-bold text-gray-800 mb-1">Cevap Yaz</h3>
+                        <p className="text-sm text-gray-500 mb-4">
+                            <span className="font-bold text-primary">@{selectedFeedback.username}</span> kullanıcısına e-posta gönderilecek.
+                        </p>
+
+                        <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 mb-4 text-sm text-gray-600 italic">
+                            "{selectedFeedback.message}"
+                        </div>
+
+                        <form onSubmit={handleSendReply}>
+                            <textarea 
+                                value={replyMessage}
+                                onChange={(e) => setReplyMessage(e.target.value)}
+                                className="w-full border rounded-xl p-3 bg-white focus:outline-primary min-h-[150px] mb-4 text-sm"
+                                placeholder="Cevabınızı buraya yazın..."
+                                required
+                            ></textarea>
+
+                            <div className="flex justify-end gap-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setReplyModalOpen(false)}
+                                    className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition"
+                                >
+                                    İptal
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={sendingReply}
+                                    className="px-6 py-2 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition shadow-lg disabled:opacity-50"
+                                >
+                                    {sendingReply ? 'Gönderiliyor...' : 'Gönder 📨'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </Layout>
     );
 }
