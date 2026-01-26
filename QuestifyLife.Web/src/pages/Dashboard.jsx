@@ -436,11 +436,26 @@ export default function Dashboard() {
                             <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">📌 Sık Kullanılanlar</h3>
                             <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x">
                                 {pinnedTemplates.map((template) => (
-                                    <div key={template.id} className="min-w-[140px] bg-white p-3 rounded-2xl border border-gray-100 shadow-sm snap-start hover:shadow-md transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleAddFromTemplate(template)}>
-                                        <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:opacity-100 transition-opacity"><span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">+ Ekle</span></div>
-                                        <button className="absolute top-0 left-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => { e.stopPropagation(); if(confirm("Bu şablonu sık kullanılanlardan kaldırmak istediğine emin misin?")) handlePinQuest(template.id); }} title="Sık kullanılanlardan kaldır">
+                                    /* GÜNCELLEME: onClick kaldırıldı, sadece butona basınca eklenecek */
+                                    <div key={template.id} className="min-w-[140px] bg-white p-3 rounded-2xl border border-gray-100 shadow-sm snap-start hover:shadow-md transition-all group relative overflow-hidden">
+                                        
+                                        {/* GÜNCELLEME: opacity-10 yerine opacity-60 ve onClick eklendi */}
+                                        <button 
+                                            className="absolute top-0 right-0 p-1 opacity-60 group-hover:opacity-100 transition-opacity z-10 hover:scale-105 active:scale-95"
+                                            onClick={(e) => { e.stopPropagation(); handleAddFromTemplate(template); }}
+                                        >
+                                            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-md font-bold shadow-sm">+ Ekle</span>
+                                        </button>
+
+                                        {/* GÜNCELLEME: opacity-0 yerine opacity-60 */}
+                                        <button 
+                                            className="absolute top-0 left-0 p-1 opacity-60 group-hover:opacity-100 transition-opacity z-10" 
+                                            onClick={(e) => { e.stopPropagation(); if(confirm("Bu şablonu sık kullanılanlardan kaldırmak istediğine emin misin?")) handlePinQuest(template.id); }} 
+                                            title="Sık kullanılanlardan kaldır"
+                                        >
                                             <span className="text-[10px] bg-red-50 text-red-500 border border-red-100 px-1.5 py-0.5 rounded-md font-bold hover:bg-red-100 hover:text-red-600 transition-colors">Kaldır</span>
                                         </button>
+
                                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-2" style={{backgroundColor: `${template.colorCode || '#3498db'}20`, color: template.colorCode || '#3498db'}}>{template.title.charAt(0).toUpperCase()}</div>
                                         <h4 className="font-bold text-gray-700 text-sm truncate mb-1">{template.title}</h4>
                                         <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-full">+{template.rewardPoints} XP</span>

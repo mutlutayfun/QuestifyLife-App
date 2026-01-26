@@ -1,86 +1,110 @@
 import React from 'react';
 import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
 
-const QuestItem = ({ quest, onToggle, onDelete, onEdit, onPin, isDayClosed }) => {
+export default function QuestItem({ quest, onToggle, onDelete, onEdit, onPin, isDayClosed, disabled }) {
+    const isCompleted = quest.isCompleted;
+    
+    // Kategori renkleri ve ikonları
+    const getCategoryStyle = (cat) => {
+        switch(cat?.toLowerCase()) {
+            case 'spor': return 'bg-orange-100 text-orange-600 border-orange-200';
+            case 'yazılım': return 'bg-blue-100 text-blue-600 border-blue-200';
+            case 'okul': return 'bg-purple-100 text-purple-600 border-purple-200';
+            case 'sağlık': return 'bg-green-100 text-green-600 border-green-200';
+            default: return 'bg-gray-100 text-gray-600 border-gray-200';
+        }
+    };
+
     return (
-        <div className={`group relative flex items-center justify-between p-4 mb-3 bg-white rounded-xl shadow-sm border transition-all hover:shadow-md 
-            ${quest.isCompleted ? 'bg-gray-50 opacity-90 border-gray-100' : 'border-gray-100'}
-            ${quest.isPinned ? 'border-l-4 border-l-yellow-400' : ''}
-            ${isDayClosed ? 'opacity-60 grayscale-[0.5] pointer-events-none' : ''} 
-        `}>
-            
-            <div className="flex items-center gap-3 overflow-hidden">
-                <button 
-                    onClick={() => !isDayClosed && onToggle(quest.id)}
-                    disabled={isDayClosed}
-                    className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
-                        ${quest.isCompleted 
-                          ? 'bg-green-500 border-green-500 text-white scale-110' 
-                          : 'border-gray-300 hover:border-blue-400 text-transparent'}
-                        ${isDayClosed ? 'cursor-not-allowed border-gray-200' : ''}  
-                    `}
-                >
-                    ✓
-                </button>
+        <div 
+            className={`group relative flex items-center gap-3 p-3 rounded-2xl border transition-all duration-300 animate-fade-in
+                ${isCompleted 
+                    ? 'bg-green-50/50 border-green-100' 
+                    : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-md'
+                }
+                ${disabled ? 'opacity-70 grayscale-[0.5]' : ''}
+            `}
+        >
+            {/* Tamamla Butonu (Checkbox) */}
+            <button 
+                onClick={() => !disabled && !isDayClosed && onToggle(quest.id)}
+                disabled={disabled || isDayClosed}
+                className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border-2 transition-all duration-300
+                    ${isCompleted 
+                        ? 'bg-green-500 border-green-500 text-white shadow-lg shadow-green-200 scale-105' 
+                        : 'bg-white border-gray-200 text-transparent hover:border-green-400'
+                    }
+                    ${(disabled || isDayClosed) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer active:scale-90'}
+                `}
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+            </button>
 
-                <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-2">
-                        <span className={`font-bold text-gray-800 text-sm truncate transition-all ${quest.isCompleted ? 'line-through text-gray-400' : ''}`}>
-                            {quest.title}
+            {/* İçerik */}
+            <div className="flex-1 min-w-0 select-none" onClick={() => !disabled && !isDayClosed && onToggle(quest.id)}>
+                <div className="flex items-center gap-2 mb-0.5">
+                    <h4 className={`font-bold text-base truncate transition-all duration-300 ${isCompleted ? 'text-gray-400 line-through decoration-2 decoration-green-300' : 'text-gray-800'}`}>
+                        {quest.title}
+                    </h4>
+                    {quest.isPinned && <span className="text-[10px] bg-yellow-100 text-yellow-600 px-1.5 py-0.5 rounded border border-yellow-200" title="Pinli Görev">📌</span>}
+                </div>
+                
+                <div className="flex items-center gap-2 text-xs flex-wrap">
+                    <span className={`px-2 py-0.5 rounded-md border font-medium ${getCategoryStyle(quest.category)}`}>
+                        {quest.category || 'Genel'}
+                    </span>
+                    <span className={`font-bold ${isCompleted ? 'text-gray-400' : 'text-blue-500'}`}>
+                        +{quest.rewardPoints} XP
+                    </span>
+                    {quest.description && (
+                         <span className="text-gray-400 truncate max-w-[120px] hidden sm:block"> • {quest.description}</span>
+                    )}
+                    {quest.reminderDate && (
+                        <span className="text-orange-400 flex items-center gap-1">
+                            ⏰ {format(new Date(quest.reminderDate), 'HH:mm', { locale: tr })}
                         </span>
-                        {/* Sabitlenmiş İkonu */}
-                        {quest.isPinned && <span className="text-[10px]" title="Her gün tekrar eder">📌</span>}
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 text-[10px] items-center mt-0.5">
-                         <span className="font-bold text-gray-400 uppercase tracking-wider">{quest.category}</span>
-                         
-                         {/* YENİ: Hatırlatıcı Göstergesi */}
-                         {quest.reminderDate && (
-                            <span className="flex items-center gap-1 font-bold text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
-                                ⏰ {format(new Date(quest.reminderDate), 'HH:mm')}
-                            </span>
-                         )}
-
-                         {quest.description && <span className="text-gray-400 truncate max-w-[150px]">• {quest.description}</span>}
-                    </div>
+                    )}
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 pl-2">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black whitespace-nowrap ${quest.isCompleted ? 'bg-gray-200 text-gray-500' : 'bg-blue-50 text-primary'}`}>
-                    +{quest.rewardPoints} XP
-                </span>
-                
-                {/* AKSİYON BUTONLARI */}
-                {!isDayClosed && (
-                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity gap-1">
-                        <button 
-                            onClick={() => onPin(quest.id)} 
-                            className={`p-1.5 rounded-lg transition-colors ${quest.isPinned ? 'text-yellow-500 bg-yellow-50' : 'text-gray-300 hover:text-yellow-500 hover:bg-yellow-50'}`}
-                            title={quest.isPinned ? "Sabitlemeyi Kaldır" : "Sabitle"}
-                        >
-                            📌
-                        </button>
-                        <button 
-                            onClick={() => onEdit(quest)} 
-                            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Düzenle"
-                        >
-                            ✏️
-                        </button>
-                        <button 
-                            onClick={() => onDelete(quest.id)} 
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Sil"
-                        >
-                            🗑️
-                        </button>
-                    </div>
-                )}
+            {/* Aksiyon Butonları */}
+            {/* GÜNCELLEME: opacity-0 yerine opacity-40 kullanıldı (Mobilde silik görünsün diye) */}
+            <div className={`flex items-center gap-1 absolute right-2 top-2 sm:relative sm:right-0 sm:top-0 transition-opacity duration-200
+                ${(disabled || isDayClosed) ? 'hidden' : 'opacity-40 group-hover:opacity-100'} 
+            `}>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onPin(quest.id); }}
+                    className={`p-1.5 rounded-lg transition-colors ${quest.isPinned ? 'text-yellow-500 bg-yellow-50' : 'text-gray-400 hover:bg-yellow-50 hover:text-yellow-500'}`}
+                    title={quest.isPinned ? "Pini Kaldır" : "Pinle"}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill={quest.isPinned ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                </button>
+
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit(quest); }}
+                    className="p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-500 rounded-lg transition-colors"
+                    title="Düzenle"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                </button>
+
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(quest.id); }}
+                    className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors"
+                    title="Sil"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
             </div>
         </div>
     );
-};
-
-export default QuestItem;
+}
