@@ -27,11 +27,11 @@ const sendNotification = (title, body) => {
     }
     
     if (Notification.permission === "granted") {
-        new Notification(title, { body, icon: '/vite.svg' });
+        new Notification(title, { body, icon: '/Happy_Fox_BF.png' });
     } else if (Notification.permission !== "denied") {
         Notification.requestPermission().then(permission => {
             if (permission === "granted") {
-                new Notification(title, { body, icon: '/vite.svg' });
+                new Notification(title, { body, icon: '/Happy_Fox_BF.png' });
             }
         });
     }
@@ -66,9 +66,8 @@ export default function Dashboard() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // ⏰ HATIRLATICI KONTROL MEKANİZMASI (GÜNCELLENDİ)
+    // ⏰ HATIRLATICI KONTROL MEKANİZMASI
     useEffect(() => {
-        // İzin iste (Sayfa yüklendiğinde)
         if ("Notification" in window && Notification.permission !== "granted") {
             Notification.requestPermission();
         }
@@ -79,47 +78,28 @@ export default function Dashboard() {
             const now = new Date();
             
             dashboardData.todayQuests.forEach(quest => {
-                // Sadece hatırlatıcısı olan, tamamlanmamış ve henüz bildirilmemiş görevlere bak
                 if (quest.reminderDate && !quest.isCompleted && !notifiedQuestsRef.current.has(quest.id)) {
                     
                     const reminderTime = new Date(quest.reminderDate);
-                    
-                    // Farkı milisaniye cinsinden hesapla
                     const diff = reminderTime.getTime() - now.getTime();
 
-                    // Debug için konsola yazdır (Geliştirme aşamasında faydalı)
-                    // console.log(`Görev: ${quest.title}, Kalan Süre: ${diff}ms`);
-
-                    // Eğer zamanı geldiyse (diff <= 0) 
-                    // VE zamanın üzerinden çok geçmediyse (1 saat tolerans -3600000ms)
                     if (diff <= 0 && diff > -3600000) { 
-                        // Bildirim Gönder
                         sendNotification("🔔 Görev Zamanı!", `${quest.title} görevini yapma zamanı geldi!`);
-                        
-                        // Bu görevi "bildirildi" olarak işaretle
                         notifiedQuestsRef.current.add(quest.id);
-                        
-                        // Opsiyonel: Ses efekti
-                        // const audio = new Audio('/notification_sound.mp3'); 
-                        // audio.play().catch(e => console.error("Ses çalınamadı:", e));
                     }
                 }
             });
         };
 
-        // Her 10 saniyede bir kontrol et (Daha sık kontrol daha hassas olur)
         const intervalId = setInterval(checkReminders, 10000);
-        
-        // İlk yüklemede de bir kez kontrol et
         checkReminders();
 
         return () => clearInterval(intervalId);
-    }, [dashboardData]); // dashboardData değiştikçe listeyi yenile (yeni görev eklendiğinde vs.)
+    }, [dashboardData]);
 
-    // ... (Kalan kodlar AYNI) ...
+    // ... Admin Check ...
     useEffect(() => {
         const checkAdminStatus = async () => {
-             // Eğer user objesinde direkt varsa oradan al
              if (user?.isAdmin || user?.IsAdmin) {
                  setIsAdmin(true);
                  return;
@@ -129,9 +109,6 @@ export default function Dashboard() {
                  const res = await api.get('/User/profile');
                  const profile = res.data.data || res.data;
                  
-                 // Backend'den gelen veriye göre admin durumunu set et
-                 // Hem camelCase (isAdmin) hem PascalCase (IsAdmin) kontrolü yapıyoruz
-                 // Böylece JSON serialization formatı ne olursa olsun çalışır
                  if (profile?.isAdmin === true || profile?.IsAdmin === true) {
                      setIsAdmin(true);
                  }
@@ -168,27 +145,20 @@ export default function Dashboard() {
     }, [user]); 
 
     const handleTutorialComplete = async (manifestoText) => {
-        // 1. Modalı kapat
         setShowTutorial(false);
-        
         try {
-            // 2. Backend'e güncelleme isteği at (Manifesto + Tutorial Görüldü)
             await api.put('/User/profile', { 
                 hasSeenTutorial: true,
                 personalManifesto: manifestoText
             });
 
-            // 3. Context'i güncelle
             updateUser({ 
                 hasSeenTutorial: true,
                 personalManifesto: manifestoText
             });
-            
             toast.success("Sözün kaydedildi kahraman! Maceraya hazırsın. 🚀");
-
         } catch (error) {
             console.error("Tutorial update error:", error);
-            // Hata olsa bile context'i güncelle ki modal tekrar çıkmasın
             updateUser({ hasSeenTutorial: true });
         }
     };
@@ -298,7 +268,7 @@ export default function Dashboard() {
                 description: updatedQuest.description,
                 rewardPoints: updatedQuest.rewardPoints || updatedQuest.points, 
                 category: updatedQuest.category,
-                reminderDate: updatedQuest.reminderDate // Hatırlatıcı tarihini de gönderiyoruz
+                reminderDate: updatedQuest.reminderDate 
             };
             await api.put('/Quests', payload); 
             toast.success("Görev güncellendi! ✨");
@@ -311,6 +281,23 @@ export default function Dashboard() {
 
     const handleToggleQuest = async (id) => {
         if (isFuture) { toast.warning("Acele etme! Bu görev yarına ait. ⏳"); return; }
+        
+        // --- GÜNLÜK LİMİT KONTROLÜ ---
+        const quest = dashboardData?.todayQuests?.find(q => q.id === id);
+        
+        // Eğer görev daha önce tamamlanmamışsa ve tamamlanmak isteniyorsa kontrol et
+        if (quest && !quest.isCompleted) {
+             const currentPoints = dashboardData.pointsEarnedToday || 0;
+             const dailyTarget = dashboardData.dailyTarget || 200; // Varsayılan 200
+             
+             // Eğer bu görev yapılırsa limit aşılıyor mu?
+             if (currentPoints + quest.rewardPoints > dailyTarget) {
+                 toast.warning(`Günlük XP sınırını (${dailyTarget}) geçemezsin! 🛑`);
+                 return; // İşlemi burada kes, API çağrısı yapma
+             }
+        }
+        // ------------------------------
+
         try {
             const res = await api.post(`/Quests/toggle/${id}`);
             if(res.data) {
@@ -369,7 +356,6 @@ export default function Dashboard() {
                 {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} onComplete={handleTutorialComplete} />}
                 {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
                 
-                {/* User Guide Modal Eklendi */}
                 <UserGuideModal isOpen={showGuideModal} onClose={() => setShowGuideModal(false)} />
 
                 <header className="bg-white shadow-sm sticky top-0 z-10">
@@ -381,7 +367,6 @@ export default function Dashboard() {
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
-                            {/* YENİ: Admin Butonu */}
                             {isAdmin && (
                                 <Link to="/admin" className="text-xs bg-red-100 text-red-600 px-2 py-1.5 rounded-lg font-bold border border-red-200 hover:bg-red-200 transition flex items-center gap-1">
                                     <span>🛠️</span> <span className="hidden sm:inline">Admin</span>
@@ -389,14 +374,12 @@ export default function Dashboard() {
                             )}
                             <span className="text-sm text-gray-600 font-medium">{user?.username}</span>
                             
-                            {/* Nasıl Oynanır Butonu - GÜNCELLENMİŞ TASARIM */}
                             <button 
                                 onClick={() => setShowGuideModal(true)} 
                                 className="group relative flex items-center justify-center w-8 h-8 bg-blue-50 text-blue-500 rounded-full hover:bg-blue-500 hover:text-white transition-all duration-300 shadow-sm hover:shadow-md hover:scale-110 active:scale-95" 
                                 title="Nasıl Oynanır?"
                             >
                                 <HelpCircle size={20} className="stroke-[2.5px]" />
-                                {/* Hafif pulse efekti */}
                                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                             </button>
 
@@ -436,10 +419,7 @@ export default function Dashboard() {
                             <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">📌 Sık Kullanılanlar</h3>
                             <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x">
                                 {pinnedTemplates.map((template) => (
-                                    /* GÜNCELLEME: onClick kaldırıldı, sadece butona basınca eklenecek */
                                     <div key={template.id} className="min-w-[140px] bg-white p-3 rounded-2xl border border-gray-100 shadow-sm snap-start hover:shadow-md transition-all group relative overflow-hidden">
-                                        
-                                        {/* GÜNCELLEME: opacity-10 yerine opacity-60 ve onClick eklendi */}
                                         <button 
                                             className="absolute top-0 right-0 p-1 opacity-60 group-hover:opacity-100 transition-opacity z-10 hover:scale-105 active:scale-95"
                                             onClick={(e) => { e.stopPropagation(); handleAddFromTemplate(template); }}
@@ -447,7 +427,6 @@ export default function Dashboard() {
                                             <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-md font-bold shadow-sm">+ Ekle</span>
                                         </button>
 
-                                        {/* GÜNCELLEME: opacity-0 yerine opacity-60 */}
                                         <button 
                                             className="absolute top-0 left-0 p-1 opacity-60 group-hover:opacity-100 transition-opacity z-10" 
                                             onClick={(e) => { e.stopPropagation(); if(confirm("Bu şablonu sık kullanılanlardan kaldırmak istediğine emin misin?")) handlePinQuest(template.id); }} 
@@ -472,7 +451,6 @@ export default function Dashboard() {
                     <div className="space-y-2 mt-4">
                         {(!dashboardData?.todayQuests || dashboardData.todayQuests.length === 0) ? (
                             <div className="text-center py-10 px-6 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300 flex flex-col items-center gap-4">
-                                {/* BOŞ DURUM GÖRSELİ */}
                                 <img src="/Sad_Fox_BF.png" alt="Waiting Fox" className="w-32 h-32 object-contain opacity-80" />
                                 <div>
                                     <p className="font-bold text-gray-600">{isToday ? "Henüz bir macera eklemedin!" : "Bu tarih için planlanmış görev yok."}</p>
