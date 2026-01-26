@@ -12,10 +12,12 @@ import { toast } from 'react-toastify';
 import { format, addDays, isSameDay } from 'date-fns'; 
 import { tr } from 'date-fns/locale'; 
 import { Link } from 'react-router-dom';
+import { HelpCircle } from 'lucide-react'; 
 
 import DailyQuote from '../components/DailyQuote';
 import TutorialModal from '../components/TutorialModal';
 import FeedbackModal from '../components/FeedbackModal';
+import UserGuideModal from '../components/UserGuideModal';
 
 // Tarayıcı Bildirimi Gönderme Yardımcısı
 const sendNotification = (title, body) => {
@@ -51,6 +53,7 @@ export default function Dashboard() {
 
     const [showTutorial, setShowTutorial] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
+    const [showGuideModal, setShowGuideModal] = useState(false); // Guide Modal State
     const [isAdmin, setIsAdmin] = useState(false);
     
 
@@ -321,7 +324,7 @@ export default function Dashboard() {
                     toast.info("Görev geri alındı. Puan silindi. ↩️");
                 }
                 if(res.data.newBadges && res.data.newBadges.length > 0) {
-                      toast.info(`🏅 Yeni Rozet: ${res.data.newBadges.join(", ")}`);
+                       toast.info(`🏅 Yeni Rozet: ${res.data.newBadges.join(", ")}`);
                 }
                 setRefreshTrigger(p => p + 1);
             }
@@ -355,7 +358,8 @@ export default function Dashboard() {
                     onConfirm={handleFinishDay}
                     summary={dashboardData}
                 />
-                  <EditQuestModal 
+                
+                <EditQuestModal 
                     isOpen={!!editingQuest} 
                     onClose={() => setEditingQuest(null)} 
                     onUpdate={handleUpdateQuest} 
@@ -364,6 +368,9 @@ export default function Dashboard() {
 
                 {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} onComplete={handleTutorialComplete} />}
                 {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+                
+                {/* User Guide Modal Eklendi */}
+                <UserGuideModal isOpen={showGuideModal} onClose={() => setShowGuideModal(false)} />
 
                 <header className="bg-white shadow-sm sticky top-0 z-10">
                     <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
@@ -381,6 +388,18 @@ export default function Dashboard() {
                                 </Link>
                             )}
                             <span className="text-sm text-gray-600 font-medium">{user?.username}</span>
+                            
+                            {/* Nasıl Oynanır Butonu - GÜNCELLENMİŞ TASARIM */}
+                            <button 
+                                onClick={() => setShowGuideModal(true)} 
+                                className="group relative flex items-center justify-center w-8 h-8 bg-blue-50 text-blue-500 rounded-full hover:bg-blue-500 hover:text-white transition-all duration-300 shadow-sm hover:shadow-md hover:scale-110 active:scale-95" 
+                                title="Nasıl Oynanır?"
+                            >
+                                <HelpCircle size={20} className="stroke-[2.5px]" />
+                                {/* Hafif pulse efekti */}
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                            </button>
+
                             <button onClick={() => setShowFeedback(true)} className="text-gray-400 hover:text-primary transition" title="Geri Bildirim">📣</button>
                             {isToday && (
                                 <button onClick={() => setIsDayEndModalOpen(true)} className="bg-dark text-white text-xs px-3 py-1.5 rounded-full font-bold hover:bg-gray-800 transition shadow-sm flex items-center gap-1"><span>🌙</span> Bitir</button>
