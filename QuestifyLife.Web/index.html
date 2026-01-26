@@ -1,16 +1,30 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <!-- Favicon güncellemesi -->
-    <link rel="icon" type="image/png" href="/public/Happy_Fox_BF.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QuestifyLife | Hayatını Oyunlaştır</title>
     
-    <!-- Manifesto alanı için el yazısı fontu (Opsiyonel ama şık durur) -->
-    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- Favicon (Yol düzeltildi: /public/.. yerine direkt /..) -->
+    <link rel="icon" type="image/png" href="/Happy_Fox_BF.png" />
+    
+    <!-- Mobil için zoom'u engelle ve native hissi ver -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <title>QuestifyLife | Hayatını Oyunlaştır</title>
+    <meta name="description" content="Hayatını oyunlaştır, görevleri tamamla, XP kazan!" />
+    <meta name="theme-color" content="#3498db" />
+
+    <!-- iOS (Apple) Web App Ayarları -->
+    <link rel="apple-touch-icon" href="/Happy_Fox_BF.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="QuestifyLife" />
+
+    <!-- Fontlar -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-gray-50 text-gray-800 font-sans antialiased">
+  <body class="bg-gray-50 text-gray-800 font-sans antialiased selection:bg-blue-100 selection:text-blue-900">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -5,6 +5,10 @@ import { tr } from 'date-fns/locale';
 export default function QuestItem({ quest, onToggle, onDelete, onEdit, onPin, isDayClosed, disabled }) {
     const isCompleted = quest.isCompleted;
     
+    // Butonların gösterilip gösterilmeyeceği kontrolü
+    // Eğer butonlar gizliyse, mobilde ekstra sağ padding (boşluk) bırakmaya gerek yok.
+    const showButtons = !disabled && !isDayClosed;
+
     // Kategori renkleri ve ikonları
     const getCategoryStyle = (cat) => {
         switch(cat?.toLowerCase()) {
@@ -44,7 +48,8 @@ export default function QuestItem({ quest, onToggle, onDelete, onEdit, onPin, is
             </button>
 
             {/* İçerik */}
-            <div className="flex-1 min-w-0 select-none" onClick={() => !disabled && !isDayClosed && onToggle(quest.id)}>
+            {/* DÜZELTME: showButtons true ise (mobilde butonlar var demektir), sağa padding (pr-20) ekleyerek metnin butonların altına girmesini engelliyoruz. */}
+            <div className={`flex-1 min-w-0 select-none ${showButtons ? 'pr-20 sm:pr-0' : ''}`} onClick={() => !disabled && !isDayClosed && onToggle(quest.id)}>
                 <div className="flex items-center gap-2 mb-0.5">
                     <h4 className={`font-bold text-base truncate transition-all duration-300 ${isCompleted ? 'text-gray-400 line-through decoration-2 decoration-green-300' : 'text-gray-800'}`}>
                         {quest.title}
@@ -71,9 +76,8 @@ export default function QuestItem({ quest, onToggle, onDelete, onEdit, onPin, is
             </div>
 
             {/* Aksiyon Butonları */}
-            {/* GÜNCELLEME: opacity-0 yerine opacity-40 kullanıldı (Mobilde silik görünsün diye) */}
             <div className={`flex items-center gap-1 absolute right-2 top-2 sm:relative sm:right-0 sm:top-0 transition-opacity duration-200
-                ${(disabled || isDayClosed) ? 'hidden' : 'opacity-40 group-hover:opacity-100'} 
+                ${!showButtons ? 'hidden' : 'opacity-40 group-hover:opacity-100'} 
             `}>
                 <button 
                     onClick={(e) => { e.stopPropagation(); onPin(quest.id); }}

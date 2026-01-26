@@ -7,15 +7,20 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      // Önbelleğe alınacak statik dosyalar
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'Happy_Fox_BF.png'],
       manifest: {
         name: 'QuestifyLife',
-        short_name: 'Questify',
-        description: 'Hayatını Oyunlaştır!',
+        short_name: 'QuestifyLife',
+        description: 'Hayatını oyunlaştır, görevleri tamamla ve seviye atla!',
         theme_color: '#3498db',
+        background_color: '#ffffff', // Açılış ekranı arka planı
+        display: 'standalone',       // Tarayıcı çubuğunu gizler, uygulama gibi açılır
+        orientation: 'portrait',     // Mobilde dik modu zorlar (isteğe bağlı)
+        start_url: '/',              // Uygulama açıldığında başlayacağı sayfa
         icons: [
           {
-            src: '/Happy_Fox_BF.png', // Bu ikonları public klasörüne koymalısın
+            src: '/Happy_Fox_BF.png',
             sizes: '192x192',
             type: 'image/png'
           },
@@ -23,6 +28,12 @@ export default defineConfig({
             src: '/Happy_Fox_BF.png',
             sizes: '512x512',
             type: 'image/png'
+          },
+          {
+            src: '/Happy_Fox_BF.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable' // Android adaptif ikon desteği için
           }
         ]
       }
