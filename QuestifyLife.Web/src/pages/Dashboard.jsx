@@ -167,7 +167,8 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const formattedDate = selectedDate.toISOString();
+                // TARIH DÜZELTMESİ: GET isteğinde de local format gönderelim ki tutarlı olsun
+                const formattedDate = format(selectedDate, "yyyy-MM-dd'T'HH:mm:ss");
                 const response = await api.get(`/Performance/dashboard?date=${formattedDate}`);
                 
                 setDashboardData(response.data);
@@ -195,38 +196,109 @@ export default function Dashboard() {
     const isFuture = selectedDate > new Date() && !isToday;
 
     const handleAddQuest = async (questData) => {
+        // --- GÜNLÜK LİMİT KONTROLÜ (EKLEME) ---
+        // Seçili günün verisi üzerinden limit kontrolü yapıyoruz.
+        // Verileri kesinlikle sayıya çeviriyoruz (Number) ki string hatası olmasın.
+        if (dashboardData) {
+             const currentPoints = Number(dashboardData.pointsEarnedToday || 0);
+             const dailyTarget = Number(dashboardData.dailyTarget || 200);
+             const reward = Number(questData.rewardPoints || 0);
+
+             // Eğer mevcut puan + eklenecek görev puanı hedefi aşıyorsa (veya zaten aştıysa)
+             if (currentPoints >= dailyTarget) {
+                 toast.warning(`Bu gün için XP hedefine (${dailyTarget}) zaten ulaştın! Yeni görev ekleyemezsin. 🛑`);
+                 return;
+             }
+             
+             if (currentPoints + reward > dailyTarget) {
+                  toast.warning(`Bu görev günlük XP sınırını (${dailyTarget}) aşmana neden olur! Daha düşük puanlı bir görev seç. 🛑`);
+                  return;
+             }
+        }
+        // ---------------------------------------
+
         try {
-            const payload = { ...questData, scheduledDate: selectedDate.toISOString() };
+            // TARİH/SAAT DÜZELTMESİ (ÇAKIŞMAYI ÖNLEME):
+            // Eğer "Bugün" seçiliyse, o anki saati (new Date) kullanıyoruz.
+            // Eğer başka bir gün seçiliyse, o günün tarihini alıp saati "şu an" yapıyoruz ki eşsiz olsun.
+            let dateToSend = selectedDate;
+            if (isToday) {
+                dateToSend = new Date();
+            } else {
+                const now = new Date();
+                dateToSend = new Date(selectedDate);
+                dateToSend.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+            }
+
+            const payload = { 
+                ...questData, 
+                scheduledDate: format(dateToSend, "yyyy-MM-dd'T'HH:mm:ss")
+            };
+            
             await api.post('/Quests', payload);
             setRefreshTrigger(prev => prev + 1);
             toast.success("Görev başarıyla eklendi! 🚀");
         } catch (error) {
             console.error(error);
-            const errorMessage = error.response?.data?.message || "Görev ekleme başarısız.";
-            toast.error(errorMessage);
+            // 500 Hatası için özel mesaj
+            if (error.response?.status === 500) {
+                 toast.error("Sunucu hatası! Kayıt çakışması veya sistem hatası.");
+            } else {
+                 const errorMessage = error.response?.data?.message || "Görev ekleme başarısız.";
+                 toast.error(errorMessage);
+            }
         }
     };
     
     const handleAddFromTemplate = async (template) => {
-        if (isToday && dashboardData?.isDayClosed) {
-            toast.warning("Bugün kapandı, yeni görev ekleyemezsin!");
-            return;
+        // --- GÜNLÜK LİMİT KONTROLÜ (ŞABLON) ---
+        if (dashboardData) {
+             const currentPoints = Number(dashboardData.pointsEarnedToday || 0);
+             const dailyTarget = Number(dashboardData.dailyTarget || 200);
+             const reward = Number(template.rewardPoints || 0);
+
+             if (currentPoints >= dailyTarget) {
+                 toast.warning(`Bu gün için XP hedefine (${dailyTarget}) zaten ulaştın! Yeni görev ekleyemezsin. 🛑`);
+                 return;
+             }
+             if (currentPoints + reward > dailyTarget) {
+                  toast.warning(`Bu görev günlük XP sınırını (${dailyTarget}) aşmana neden olur! 🛑`);
+                  return;
+             }
         }
+        // ---------------------------------------
+
+        // TARİH/SAAT DÜZELTMESİ (ÇAKIŞMAYI ÖNLEME):
+        let dateToSend = selectedDate;
+        if (isToday) {
+            dateToSend = new Date();
+        } else {
+            const now = new Date();
+            dateToSend = new Date(selectedDate);
+            dateToSend.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+        }
+
         const newQuestData = {
             title: template.title,
             description: template.description || "",
             rewardPoints: template.rewardPoints,
             category: template.category || "Genel",
             colorCode: template.colorCode || "#3498db",
-            scheduledDate: selectedDate.toISOString()
+            scheduledDate: format(dateToSend, "yyyy-MM-dd'T'HH:mm:ss")
         };
+        
         try {
             await api.post('/Quests', newQuestData);
             setRefreshTrigger(prev => prev + 1);
             toast.success(`"${template.title}" listeye eklendi! 🚀`);
         } catch (error) {
-            const errorMessage = error.response?.data?.message || "Şablondan ekleme başarısız.";
-            toast.error(errorMessage);
+            console.error("Template Add Error:", error);
+            if (error.response?.status === 500) {
+                toast.error("Sunucu hatası! Kayıt çakışması veya limit hatası.");
+            } else {
+                const errorMessage = error.response?.data?.message || "Şablondan ekleme başarısız.";
+                toast.error(errorMessage);
+            }
         }
     };
 
@@ -291,19 +363,25 @@ export default function Dashboard() {
     };
 
     const handleToggleQuest = async (id) => {
+        // Gelecek görevleri tamamlama (checkbox) engeli burada kalmalı
         if (isFuture) { toast.warning("Acele etme! Bu görev yarına ait. ⏳"); return; }
         
+        // --- GÜNLÜK LİMİT KONTROLÜ (TAMAMLAMA) ---
         const quest = dashboardData?.todayQuests?.find(q => q.id === id);
         
+        // Eğer görev daha önce tamamlanmamışsa ve tamamlanmak isteniyorsa kontrol et
         if (quest && !quest.isCompleted) {
-             const currentPoints = dashboardData.pointsEarnedToday || 0;
-             const dailyTarget = dashboardData.dailyTarget || 200; 
+             const currentPoints = Number(dashboardData.pointsEarnedToday || 0);
+             const dailyTarget = Number(dashboardData.dailyTarget || 200); 
+             const questReward = Number(quest.rewardPoints || 0);
              
-             if (currentPoints + quest.rewardPoints > dailyTarget) {
+             // Eğer bu görev yapılırsa limit aşılıyor mu?
+             if (currentPoints + questReward > dailyTarget) {
                  toast.warning(`Günlük XP sınırını (${dailyTarget}) geçemezsin! 🛑`);
-                 return;
+                 return; // İşlemi burada kes, API çağrısı yapma
              }
         }
+        // ------------------------------
 
         try {
             const res = await api.post(`/Quests/toggle/${id}`);
@@ -468,7 +546,8 @@ export default function Dashboard() {
 
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><span>⚡</span> {isToday ? "Bugünün Görevleri" : "Planlanan Görevler"}</h2>
                     
-                    <AddQuestForm onAdd={handleAddQuest} disabled={isToday && dashboardData?.isDayClosed} />
+                    {/* DÜZELTME: disabled prop'u kaldırıldı - HER ZAMAN AKTİF */}
+                    <AddQuestForm onAdd={handleAddQuest} />
 
                     <div className="space-y-2 mt-4">
                         {(!dashboardData?.todayQuests || dashboardData.todayQuests.length === 0) ? (
@@ -489,7 +568,8 @@ export default function Dashboard() {
                                     onEdit={(q) => setEditingQuest(q)}
                                     onPin={handlePinQuest}
                                     isDayClosed={dashboardData?.isDayClosed}
-                                    disabled={isFuture} 
+                                    // DÜZELTME: disabled prop'u false yapıldı - Düzenleme/Silme her zaman aktif
+                                    disabled={false} 
                                 />
                             ))
                         )}
