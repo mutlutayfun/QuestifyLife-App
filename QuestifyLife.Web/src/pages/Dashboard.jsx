@@ -246,10 +246,21 @@ export default function Dashboard() {
         try {
             const response = await api.post('/Performance/finish-day', { note });
             setIsDayEndModalOpen(false); 
-            if (!response.data.isSuccess) { toast.warning(response.data.message); return; }
-            toast.success(response.data.message); 
-            setShowConfetti(true);
-            setTimeout(() => setShowConfetti(false), 5000);
+            
+            if (!response.data.isSuccess) { 
+                toast.warning(response.data.message); 
+                return; 
+            }
+            
+            // Eğer "Hedefe ulaştın" mesajı varsa büyük kutlama, yoksa normal bilgilendirme
+            if (response.data.message.includes("Hedefe ulaştın")) {
+                toast.success(response.data.message);
+                setShowConfetti(true);
+                setTimeout(() => setShowConfetti(false), 5000);
+            } else {
+                toast.info(response.data.message);
+            }
+            
             if(response.data.newBadges && response.data.newBadges.length > 0) {
                 toast.info(`🏅 Yeni Rozet: ${response.data.newBadges.join(", ")}`);
             }
@@ -282,21 +293,17 @@ export default function Dashboard() {
     const handleToggleQuest = async (id) => {
         if (isFuture) { toast.warning("Acele etme! Bu görev yarına ait. ⏳"); return; }
         
-        // --- GÜNLÜK LİMİT KONTROLÜ ---
         const quest = dashboardData?.todayQuests?.find(q => q.id === id);
         
-        // Eğer görev daha önce tamamlanmamışsa ve tamamlanmak isteniyorsa kontrol et
         if (quest && !quest.isCompleted) {
              const currentPoints = dashboardData.pointsEarnedToday || 0;
-             const dailyTarget = dashboardData.dailyTarget || 200; // Varsayılan 200
+             const dailyTarget = dashboardData.dailyTarget || 200; 
              
-             // Eğer bu görev yapılırsa limit aşılıyor mu?
              if (currentPoints + quest.rewardPoints > dailyTarget) {
                  toast.warning(`Günlük XP sınırını (${dailyTarget}) geçemezsin! 🛑`);
-                 return; // İşlemi burada kes, API çağrısı yapma
+                 return;
              }
         }
-        // ------------------------------
 
         try {
             const res = await api.post(`/Quests/toggle/${id}`);
@@ -394,9 +401,24 @@ export default function Dashboard() {
                 <main className="max-w-md mx-auto px-4 py-6 animate-fade-in-up space-y-6">
                     {isToday && <DailyQuote />}
                     {isToday ? (
-                        <div className="grid grid-cols-2 gap-3">
-                            <StatsCard title="Günlük Puan" value={`${dashboardData?.pointsEarnedToday} / ${dashboardData?.dailyTarget}`} icon="🎯" color="border-primary" />
-                            <StatsCard title="Seri (Gün)" value={dashboardData?.currentStreak} icon="🔥" color="border-secondary" />
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <StatsCard title="Günlük Puan" value={`${dashboardData?.pointsEarnedToday} / ${dashboardData?.dailyTarget}`} icon="🎯" color="border-primary" />
+                                
+                                <div className="flex flex-col gap-1">
+                                    <StatsCard title="Seri (Gün)" value={dashboardData?.currentStreak} icon="🔥" color="border-secondary" />
+                                    {/* SADELEŞTİRİLMİŞ DURUM MESAJI */}
+                                    {dashboardData?.streakStatusMessage && (
+                                        <div className={`text-[10px] text-center font-bold px-2 py-0.5 rounded-md ${
+                                            dashboardData.consecutiveMissedDays > 0 
+                                                ? 'bg-red-50 text-red-500 animate-pulse' 
+                                                : 'bg-green-50 text-green-600'
+                                        }`}>
+                                            {dashboardData.streakStatusMessage}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center">

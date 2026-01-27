@@ -43,7 +43,7 @@ namespace QuestifyLife.Infrastructure.Services
                 .GetWhere(q => q.UserId == userId && q.ScheduledDate.Date == targetDate)
                 .ToListAsync();
 
-            // 2. Kazanılan puanı hesapla (görevlerden)
+            // 2. Kazanılan puanı hesapla
             var pointsEarnedOnTargetDate = targetQuests
                 .Where(q => q.IsCompleted)
                 .Sum(q => q.RewardPoints);
@@ -53,7 +53,7 @@ namespace QuestifyLife.Infrastructure.Services
                 .GetWhere(d => d.UserId == userId && d.Date == targetDate)
                 .FirstOrDefaultAsync();
 
-            // 4. Pinlenmiş (Sabit) görev şablonlarını çek
+            // 4. Pinlenmiş görev şablonları
             var allPinned = await _questRepository
                 .GetWhere(q => q.UserId == userId && q.IsPinned)
                 .OrderByDescending(q => q.CreatedDate)
@@ -72,10 +72,28 @@ namespace QuestifyLife.Infrastructure.Services
                     ColorCode = q.ColorCode,
                     IsPinned = true,
                     IsCompleted = false,
-                    // DÜZELTME: Şablonlar için de hatırlatıcıyı taşıyoruz (eğer varsa)
                     ReminderDate = q.ReminderDate
                 })
                 .ToList();
+
+            // --- YENİ: Seri Durumu ve Motivasyon Mesajı Hesaplama ---
+            // Bugünden geriye dönük kaç gün kaçırılmış kontrol et
+            int consecutiveMisses = await CalculateConsecutiveMisses(userId, targetDate);
+
+            string streakStatusMsg = "Serin Güvende! 🔥";
+            string motivationalMsg = "Harika gidiyorsun, aynen devam!";
+
+            if (consecutiveMisses == 1)
+            {
+                streakStatusMsg = "Uyarı: Dün Hedefi Kaçırdın! ⚠️";
+                motivationalMsg = "Sorun yok, bugün telafi edip serini koruyabilirsin. Sana güveniyorum!";
+            }
+            else if (consecutiveMisses == 2)
+            {
+                streakStatusMsg = "KRİTİK DURUM! 🚨";
+                motivationalMsg = "Bugün son şansın! Eğer bugün de hedefi tutturamazsan serin sıfırlanacak. Yapabilirsin!";
+            }
+            // --------------------------------------------------------
 
             return new DashboardDto
             {
@@ -83,12 +101,13 @@ namespace QuestifyLife.Infrastructure.Services
                 TotalXp = user.TotalXp,
                 DailyTarget = user.DailyTargetPoints,
                 CurrentStreak = user.CurrentStreak,
-
-                // Bugün kazanılan puan
                 PointsEarnedToday = pointsEarnedOnTargetDate,
-
-                // DÜZELTME: Entity'deki isim "IsDayClosed"
                 IsDayClosed = targetPerformance != null ? targetPerformance.IsDayClosed : false,
+
+                // Yeni alanları dolduruyoruz
+                StreakStatusMessage = streakStatusMsg,
+                MotivationalMessage = motivationalMsg,
+                ConsecutiveMissedDays = consecutiveMisses,
 
                 TodayQuests = targetQuests.Select(q => new QuestDto
                 {
@@ -100,7 +119,6 @@ namespace QuestifyLife.Infrastructure.Services
                     IsPinned = q.IsPinned,
                     Category = q.Category,
                     ColorCode = q.ColorCode,
-                    // DÜZELTME: İşte eksik olan parça burasıydı!
                     ReminderDate = q.ReminderDate
                 }).ToList(),
 
@@ -115,12 +133,10 @@ namespace QuestifyLife.Infrastructure.Services
 
             var today = DateTime.UtcNow.Date;
 
-            // 1. Bugünün performans kaydını bul
             var performance = await _dailyPerformanceRepository
                 .GetWhere(d => d.UserId == userId && d.Date == today)
                 .FirstOrDefaultAsync();
 
-            // 2. KONTROL: Kayıt var VE IsDayClosed=true ise hata ver.
             if (performance != null && performance.IsDayClosed)
             {
                 return new OperationResultDto { IsSuccess = false, Message = "Bugün zaten kapatılmış! Yarın görüşürüz. 👋" };
@@ -131,40 +147,56 @@ namespace QuestifyLife.Infrastructure.Services
                 .ToListAsync();
 
             int earnedPoints = todaysQuests.Where(q => q.IsCompleted).Sum(q => q.RewardPoints);
-            // Ceza puanlarını hesapla (tamamlanmamış görevlerden)
             int penaltyPoints = todaysQuests.Where(q => !q.IsCompleted).Sum(q => q.PenaltyPoints);
 
-            // Ceza puanlarını kullanıcıdan düşüyoruz (0'ın altına inmesin)
             if (penaltyPoints > 0)
             {
                 user.TotalXp = Math.Max(0, user.TotalXp - penaltyPoints);
             }
 
             bool isTargetReached = earnedPoints >= user.DailyTargetPoints;
+            string resultMessage = "";
 
-            // Streak (Seri) Güncelleme
+            // --- YENİ MANTIK: 3 Gün Kuralı ---
+            // Önce geçmiş kaçırmaları hesapla (bugün hariç)
+            int pastMisses = await CalculateConsecutiveMisses(userId, today);
+
             if (isTargetReached)
             {
-                // Eğer gün daha önce kapatılmadıysa seriyi artır
+                // Bugün başarılı! Seri artar, risk sıfırlanır.
                 user.CurrentStreak++;
+                resultMessage = "Harikasın! Hedefi tutturdun, seri tam gaz devam ediyor! 🔥";
             }
             else
             {
-                // Hedefe ulaşılamadıysa seri sıfırlanır
-                user.CurrentStreak = 0;
-            }
+                // Bugün başarısız.
+                // Eğer geçmişten 2 tane varsa + bugün (1) = 3 olur ve seri yanar.
+                int totalConsecutiveFails = pastMisses + 1;
 
-            // 3. Kayıt İşlemi (Ekleme veya Güncelleme)
+                if (totalConsecutiveFails >= 3)
+                {
+                    user.CurrentStreak = 0;
+                    resultMessage = "Üzgünüm... 3 gün üst üste hedefi tutturamadığın için serin sıfırlandı. Yeni bir sayfa açalım! 💪";
+                }
+                else
+                {
+                    // Seri bozulmadı ama tehlike arttı
+                    // totalConsecutiveFails 1 ise (Sadece bugün kaçtı)
+                    // totalConsecutiveFails 2 ise (Dün ve Bugün kaçtı)
+                    resultMessage = $"Hedef tutturulamadı. Dikkat et, üst üste 3 gün yapamazsan serin bozulur. ({totalConsecutiveFails}/3 Hata) ⚠️";
+                }
+            }
+            // ---------------------------------
+
             if (performance == null)
             {
-                // Hiç kayıt yoksa yeni oluştur
                 performance = new DailyPerformance
                 {
                     UserId = userId,
                     Date = today,
                     TotalPointsEarned = earnedPoints,
                     IsTargetReached = isTargetReached,
-                    IsDayClosed = true, // Günü kapatıyoruz
+                    IsDayClosed = true,
                     RolloverDebt = isTargetReached ? 0 : (user.DailyTargetPoints - earnedPoints),
                     DayNote = dayNote
                 };
@@ -172,33 +204,31 @@ namespace QuestifyLife.Infrastructure.Services
             }
             else
             {
-                // Kayıt varsa (gün içinde işlem yapılmışsa) güncelle ve kapat
                 performance.TotalPointsEarned = earnedPoints;
                 performance.IsTargetReached = isTargetReached;
-                performance.IsDayClosed = true; // Günü kapatıyoruz
+                performance.IsDayClosed = true;
                 performance.RolloverDebt = isTargetReached ? 0 : (user.DailyTargetPoints - earnedPoints);
                 performance.DayNote = dayNote;
 
                 _dailyPerformanceRepository.Update(performance);
             }
 
-            // Kullanıcıyı güncelle (Streak ve XP değiştiği için)
             _userRepository.Update(user);
 
             await _userRepository.SaveAsync();
             await _dailyPerformanceRepository.SaveAsync();
 
-            // Rozet kontrolü yap
             var newBadges = await _badgeService.CheckAndAwardBadgesAsync(userId);
 
             return new OperationResultDto
             {
                 IsSuccess = true,
-                Message = $"Gün başarıyla kapatıldı! {(isTargetReached ? "Hedefe ulaştın! 🔥" : "Hedef tamamlanamadı.")}",
+                Message = resultMessage,
                 NewBadges = newBadges
             };
         }
 
+        // ... GetCalendarDataAsync ve GetLeaderboardAsync aynı kalıyor ...
         public async Task<List<CalendarDayDto>> GetCalendarDataAsync(Guid userId, int year, int month)
         {
             var performances = await _dailyPerformanceRepository
@@ -261,6 +291,31 @@ namespace QuestifyLife.Infrastructure.Services
             }
 
             return new ServiceResponse<List<LeaderboardUserDto>>(leaderboard);
+        }
+
+        // --- YARDIMCI METOT: Geriye Dönük Kaçırma Kontrolü ---
+        private async Task<int> CalculateConsecutiveMisses(Guid userId, DateTime referenceDate)
+        {
+            // Referans tarihten (genellikle Bugün) önceki günleri kontrol et
+            var yesterday = referenceDate.AddDays(-1);
+            var dayBeforeYesterday = referenceDate.AddDays(-2);
+
+            // Dün ve evvelsi günün kayıtlarını çek
+            var records = await _dailyPerformanceRepository
+                .GetWhere(d => d.UserId == userId && (d.Date == yesterday || d.Date == dayBeforeYesterday))
+                .ToListAsync();
+
+            var pYesterday = records.FirstOrDefault(d => d.Date == yesterday);
+            var pDayBefore = records.FirstOrDefault(d => d.Date == dayBeforeYesterday);
+
+            // Kayıt yoksa VEYA hedef tutmamışsa "Kaçırılmış" sayılır
+            bool missedYesterday = pYesterday == null || !pYesterday.IsTargetReached;
+            bool missedDayBefore = pDayBefore == null || !pDayBefore.IsTargetReached;
+
+            if (missedYesterday && missedDayBefore) return 2; // Son 2 gün kaçmış (Bugün de kaçarsa 3 olacak)
+            if (missedYesterday) return 1; // Sadece dün kaçmış
+
+            return 0; // Dün başarılıymış, zincir sağlam
         }
     }
 }

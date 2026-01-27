@@ -67,6 +67,36 @@ export default function UserGuideModal({ isOpen, onClose }) {
                 </div>
             )
         },
+        // --- YENİ EKLENEN ADIM: ZİNCİR KURALI ---
+        {
+            title: "Zincir Kuralı (3 Hak) 🛡️",
+            image: "/Sad_Fox_BF.png", // Üzgün tilki (uyarıyı temsil etmesi için)
+            content: (
+                <div className="space-y-4 text-center">
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                        Serini (streak) korumak için her gün hedefini tutturmalısın. 
+                        Ama hayat bu, bazen aksilikler olabilir.
+                    </p>
+                    
+                    <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 text-left text-xs space-y-3 shadow-sm">
+                        <h4 className="font-bold text-orange-800 border-b border-orange-200 pb-1 mb-2">Nasıl Çalışır?</h4>
+                        <div className="flex items-start gap-2">
+                            <span className="text-lg leading-none">⚠️</span>
+                            <span className="text-gray-700">Hedefi kaçırdığın <strong>ilk gün</strong> sadece uyarı alırsın. Serin bozulmaz.</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <span className="text-lg leading-none">🛑</span>
+                            <span className="text-gray-700"><strong>İkinci gün</strong> de kaçırırsan durum kritikleşir.</span>
+                        </div>
+                        <div className="flex items-start gap-2 font-bold text-red-600 bg-red-50 p-2 rounded-lg">
+                            <span className="text-lg leading-none">☠️</span>
+                            <span><strong>3 gün üst üste</strong> hedefini tutturamazsan serin sıfırlanır!</span>
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        // ----------------------------------------
         {
             title: "Günü Bitir & Ayarlar 🌙",
             image: "/Happy_Fox_BF.png", // Standart mutlu tilki
