@@ -21,6 +21,7 @@ namespace QuestifyLife.Infrastructure.Services
         private readonly IGenericRepository<DailyPerformance> _dailyPerformanceRepository;
 
         private const int MAX_QUEST_POINTS = 30;
+        private const int MAX_DAILY_QUEST_COUNT = 50; // Günlük Maksimum Görev Sayısı
 
         public QuestService(
             QuestifyLifeDbContext context,
@@ -43,8 +44,8 @@ namespace QuestifyLife.Infrastructure.Services
 
             if (request.RewardPoints > MAX_QUEST_POINTS)
                 throw new ArgumentException($"Maksimum {MAX_QUEST_POINTS} XP sınırı aşıldı.");
-            
-            if (request.RewardPoints <= 0) 
+
+            if (request.RewardPoints <= 0)
                 throw new ArgumentException("Puan geçersiz.");
 
             // Tarih kontrolü - Local TR saatine göre normalize et
@@ -64,19 +65,22 @@ namespace QuestifyLife.Infrastructure.Services
 
             // Sadece "Bugün" için kilit kontrolü yap (Gelecek planlamayı engelleme)
             var trNow = DateTime.UtcNow.AddHours(3).Date;
-            if (isDayClosed && targetDateOnly <= trNow) 
+            if (isDayClosed && targetDateOnly <= trNow)
                 throw new InvalidOperationException("Bu gün başarıyla tamamlandı ve kilitlendi! Yeni planlarını yarın için yapmalısın. 🌙");
 
-            // XP LİMİT KONTROLÜ
-            var existingTotalPoints = await _questRepository
-                .GetWhere(q => q.UserId == request.UserId && q.ScheduledDate >= dayStartUtc && q.ScheduledDate <= dayEndUtc)
-                .SumAsync(q => q.RewardPoints);
+            // --- DEĞİŞİKLİK: XP LİMİT KONTROLÜ KALDIRILDI, GÖREV SAYISI LİMİTİ EKLENDİ ---
 
-            if (existingTotalPoints + request.RewardPoints > user.DailyTargetPoints)
+            // Günlük görev sayısı kontrolü
+            var dailyQuestCount = await _questRepository
+                .GetWhere(q => q.UserId == request.UserId && q.ScheduledDate >= dayStartUtc && q.ScheduledDate <= dayEndUtc)
+                .CountAsync();
+
+            if (dailyQuestCount >= MAX_DAILY_QUEST_COUNT)
             {
-                int remaining = user.DailyTargetPoints - existingTotalPoints;
-                throw new InvalidOperationException($"Günlük XP limitine ulaştın. Kalan kapasite: {Math.Max(0, remaining)} XP.");
+                throw new InvalidOperationException($"Günlük maksimum {MAX_DAILY_QUEST_COUNT} görev ekleyebilirsiniz.");
             }
+
+            // (Eski XP kontrol bloğu tamamen kaldırıldı çünkü planlamada sınır yok)
 
             var newQuest = new Quest
             {
@@ -121,8 +125,6 @@ namespace QuestifyLife.Infrastructure.Services
                 .ToListAsync();
         }
 
-        // ... Diğer metodlar aynı kalabilir, CreateQuest'teki kilit mantığı asıl sorunu çözer.
-        
         public async Task<List<QuestDto>> GetPinnedTemplatesAsync(Guid userId)
         {
             return await _questRepository
@@ -130,9 +132,15 @@ namespace QuestifyLife.Infrastructure.Services
                 .OrderByDescending(q => q.CreatedDate)
                 .GroupBy(q => q.Title)
                 .Select(g => g.First())
-                .Select(q => new QuestDto {
-                    Id = q.Id, Title = q.Title, Description = q.Description, RewardPoints = q.RewardPoints,
-                    Category = q.Category, ColorCode = q.ColorCode, IsPinned = true
+                .Select(q => new QuestDto
+                {
+                    Id = q.Id,
+                    Title = q.Title,
+                    Description = q.Description,
+                    RewardPoints = q.RewardPoints,
+                    Category = q.Category,
+                    ColorCode = q.ColorCode,
+                    IsPinned = true
                 }).ToListAsync();
         }
 
@@ -148,8 +156,8 @@ namespace QuestifyLife.Infrastructure.Services
 
         public async Task<OperationResultDto> ToggleQuestStatusAsync(Guid questId, Guid userId)
         {
-            // Transactional logic remains similar but ensures error handling doesn't return 500 silently
-            try {
+            try
+            {
                 var quest = await _questRepository.GetByIdAsync(questId);
                 if (quest == null || quest.UserId != userId) return new OperationResultDto { IsSuccess = false, Message = "Erişim engellendi." };
 
@@ -165,9 +173,11 @@ namespace QuestifyLife.Infrastructure.Services
 
                 _questRepository.Update(quest);
                 await _questRepository.SaveAsync();
-                
+
                 return new OperationResultDto { IsSuccess = true, IsCompleted = quest.IsCompleted, Message = "Güncellendi" };
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 return new OperationResultDto { IsSuccess = false, Message = ex.Message };
             }
         }
@@ -176,11 +186,11 @@ namespace QuestifyLife.Infrastructure.Services
         {
             var quest = await _questRepository.GetByIdAsync(request.Id);
             if (quest == null || quest.UserId != request.UserId) throw new UnauthorizedAccessException();
-            
+
             quest.Title = request.Title;
             quest.Description = request.Description;
             quest.RewardPoints = request.RewardPoints;
-            
+
             _questRepository.Update(quest);
             await _questRepository.SaveAsync();
             return true;

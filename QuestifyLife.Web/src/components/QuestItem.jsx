@@ -12,10 +12,14 @@ export default function QuestItem({ quest, onToggle, onDelete, onEdit, onPin, is
     // Kategori renkleri ve ikonları
     const getCategoryStyle = (cat) => {
         switch(cat?.toLowerCase()) {
+            case 'genel': return 'bg-gray-100 text-gray-600 border-gray-200';
+            case 'özel': return 'bg-red-100 text-red-600 border-red-200';
             case 'spor': return 'bg-orange-100 text-orange-600 border-orange-200';
             case 'yazılım': return 'bg-blue-100 text-blue-600 border-blue-200';
             case 'okul': return 'bg-purple-100 text-purple-600 border-purple-200';
             case 'sağlık': return 'bg-green-100 text-green-600 border-green-200';
+            case 'kişisel gelişim': return 'bg-yellow-100 text-yellow-600 border-yellow-200';
+            case 'diğer': return 'bg-pink-100 text-pink-600 border-pink-200';
             default: return 'bg-gray-100 text-gray-600 border-gray-200';
         }
     };
