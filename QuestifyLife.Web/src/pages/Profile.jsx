@@ -161,6 +161,7 @@ export default function Profile() {
                                 </button>
                             ))}
                         </div>
+                        <button onClick={logout} className="w-full py-3.5 text-red-500 font-bold bg-red-50 rounded-xl hover:bg-red-100 transition border border-red-100 mb-8">Çıkış Yap</button>
 
                         
                     </div>
@@ -215,7 +216,7 @@ export default function Profile() {
                             <h3 className="font-bold text-gray-800 mb-6 text-sm uppercase tracking-wider border-b pb-3">Güvenlik</h3>
                             <ChangePasswordForm />
                         </div>
-                        <button onClick={logout} className="w-full py-3.5 text-red-500 font-bold bg-red-50 rounded-xl hover:bg-red-100 transition border border-red-100 mb-8">Çıkış Yap</button>
+                        
                     </div>
                 )}
             </div>

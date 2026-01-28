@@ -79,23 +79,27 @@ const AddQuestForm = ({ onAdd, disabled }) => {
         return (
             <button 
                 onClick={() => setIsOpen(true)}
-                className="w-full py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-bold hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-bold hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2 group bg-white hover:shadow-sm"
             >
-                <span>+</span> Yeni Macera Ekle
+                <span className="bg-blue-50 text-blue-500 w-6 h-6 rounded-full flex items-center justify-center text-sm group-hover:scale-110 transition-transform">+</span> 
+                <span>Yeni Macera Ekle</span>
             </button>
         );
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white p-4 rounded-xl shadow-lg border border-blue-50 animate-fade-in-up">
+        <form onSubmit={handleSubmit} className="bg-white p-5 rounded-2xl shadow-lg border border-blue-100 animate-fade-in-up relative overflow-hidden">
+             {/* Dekoratif Arka Plan */}
+             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50 pointer-events-none"></div>
+
             {/* Görev Başlığı (Zorunlu) */}
-            <div className="mb-3">
-                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Görev Başlığı <span className="text-red-500">*</span></label>
+            <div className="mb-4 relative z-10">
+                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Görev Başlığı <span className="text-red-500">*</span></label>
                 <input 
                     type="text" 
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full p-2 border border-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold text-gray-700"
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-bold text-gray-700 placeholder-gray-300 transition-all shadow-sm"
                     placeholder="Örn: 20 dk meditasyon"
                     required
                     autoFocus
@@ -103,19 +107,19 @@ const AddQuestForm = ({ onAdd, disabled }) => {
             </div>
 
             {/* Açıklama (Opsiyonel) */}
-            <div className="mb-3">
-                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Açıklama (İsteğe Bağlı)</label>
+            <div className="mb-4 relative z-10">
+                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Açıklama</label>
                 <textarea 
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full p-2 border border-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm h-16 resize-none text-gray-600"
-                    placeholder="Detay eklemek istersen..."
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm h-20 resize-none text-gray-600 placeholder-gray-300 transition-all shadow-sm"
+                    placeholder="Detaylar..."
                 />
             </div>
             
             {/* Puan Seçimi - Sticker Style */}
-            <div className="mb-4">
-                <label className="block text-[10px] font-black text-gray-400 uppercase mb-2">Zorluk Seviyesi (XP)</label>
+            <div className="mb-5 relative z-10">
+                <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Zorluk Seviyesi</label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                     {POINT_OPTIONS.map((opt) => (
                         <button
@@ -124,7 +128,7 @@ const AddQuestForm = ({ onAdd, disabled }) => {
                             onClick={() => setPoints(opt.value)}
                             className={`relative flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all duration-200
                                 ${points === opt.value 
-                                    ? 'border-orange-400 bg-orange-50 text-orange-600 scale-105 shadow-md z-10' 
+                                    ? 'border-orange-400 bg-orange-50 text-orange-600 scale-105 shadow-md z-10 ring-2 ring-orange-200 ring-offset-1' 
                                     : `border-gray-50 bg-gray-50/50 text-gray-400 opacity-80 hover:opacity-100 hover:scale-105 ${opt.color}`
                                 }
                             `}
@@ -141,31 +145,31 @@ const AddQuestForm = ({ onAdd, disabled }) => {
                 </div>
             </div>
 
-            <div className="flex gap-3 mb-4">
+            <div className="flex gap-3 mb-5 relative z-10">
                 {/* Kategori Girişi */}
                 <div className="flex-1">
-                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Kategori <span className="text-red-500">*</span></label>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Kategori <span className="text-red-500">*</span></label>
                     <input 
                         type="text"
                         value={category} 
                         onChange={(e) => setCategory(e.target.value)}
-                        className="w-full p-2 border border-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-medium"
-                        placeholder="Örn: Spor, İş..."
+                        className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-bold text-gray-700 placeholder-gray-300 transition-all shadow-sm"
+                        placeholder="Spor, İş..."
                         required
                     />
                 </div>
 
                 {/* Hatırlatıcı Bölümü */}
                 <div className="w-1/3">
-                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Hatırlatıcı</label>
-                     <div className="flex items-center gap-2 h-[38px]">
+                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5 ml-1">Hatırlatıcı</label>
+                     <div className="flex items-center gap-2 h-[46px]">
                         <button
                             type="button"
                             onClick={() => setHasReminder(!hasReminder)}
-                            className={`h-full aspect-square rounded-lg border transition-colors flex items-center justify-center 
+                            className={`h-full aspect-square rounded-xl border-2 transition-all flex items-center justify-center shadow-sm
                                 ${hasReminder 
                                     ? 'bg-orange-100 border-orange-200 text-orange-500 animate-pulse' 
-                                    : 'bg-gray-50 border-gray-100 text-gray-400 hover:border-orange-200 hover:text-orange-400'}`}
+                                    : 'bg-white border-gray-100 text-gray-400 hover:border-orange-200 hover:text-orange-400'}`}
                             title="Hatırlatıcı Ekle"
                         >
                             🔔
@@ -176,7 +180,7 @@ const AddQuestForm = ({ onAdd, disabled }) => {
                                 type="time"
                                 value={reminderTime}
                                 onChange={(e) => setReminderTime(e.target.value)}
-                                className="h-full w-full p-1 text-xs font-bold bg-white border border-gray-200 rounded-lg outline-none focus:border-orange-300 text-gray-700 text-center"
+                                className="h-full w-full p-1 text-xs font-bold bg-white border-2 border-orange-100 rounded-xl outline-none focus:border-orange-300 text-gray-700 text-center shadow-sm"
                                 required={hasReminder}
                             />
                         )}
@@ -184,9 +188,9 @@ const AddQuestForm = ({ onAdd, disabled }) => {
                 </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-gray-50">
-                <button type="button" onClick={() => setIsOpen(false)} className="px-4 py-2 text-gray-400 text-sm font-bold hover:text-gray-600 transition-colors">İptal</button>
-                <button type="submit" className="px-6 py-2 bg-gradient-to-r from-primary to-blue-600 text-white rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
+            <div className="flex justify-end gap-3 pt-2 border-t border-gray-50 relative z-10">
+                <button type="button" onClick={() => setIsOpen(false)} className="px-5 py-2.5 text-gray-400 text-sm font-bold hover:text-gray-600 transition-colors hover:bg-gray-50 rounded-xl">İptal</button>
+                <button type="submit" className="px-8 py-2.5 bg-gradient-to-r from-primary to-blue-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
                     <span>🚀</span> Başla
                 </button>
             </div>

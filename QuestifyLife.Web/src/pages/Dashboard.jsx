@@ -12,7 +12,7 @@ import { toast } from 'react-toastify';
 import { format, addDays, isSameDay, startOfDay, isValid } from 'date-fns'; 
 import { tr } from 'date-fns/locale'; 
 import { Link } from 'react-router-dom';
-import { HelpCircle } from 'lucide-react'; 
+import { HelpCircle, ChevronLeft, ChevronRight, Calendar, Star, Trophy, Zap } from 'lucide-react'; 
 
 import DailyQuote from '../components/DailyQuote';
 import TutorialModal from '../components/TutorialModal';
@@ -168,9 +168,7 @@ export default function Dashboard() {
             try {
                 if (!isValid(selectedDate)) return;
 
-                // TARIH DÜZELTMESİ: startOfDay kullanarak günün başlangıcını garanti ediyoruz
                 const dayStart = startOfDay(selectedDate);
-                // Backend'in tarih bazlı filtrelemesinde kayma olmaması için gün ortasına sabitle
                 dayStart.setHours(12, 0, 0, 0); 
                 const formattedDate = format(dayStart, "yyyy-MM-dd'T'HH:mm:ss");
                 
@@ -205,7 +203,6 @@ export default function Dashboard() {
 
         const currentRewardPoints = Number(questData.rewardPoints || questData.points || 0);
 
-        // --- FRONTEND LİMİT VE KİLİT KONTROLÜ ---
         if (dashboardData) {
              if (dashboardData.isDayClosed && isToday) {
                  toast.warning("Bugünü zaten bitirdin! Yeni planlar için yarını seçmelisin. 🌙");
@@ -218,15 +215,11 @@ export default function Dashboard() {
                  toast.warning("Günlük 50 görev sınırına ulaştınız! Mevcut görevlerden bazılarını silerek yer açabilirsiniz. 🛑");
                  return;
              }
-             
-             // 2. XP SINIRI KONTROLÜ İPTAL EDİLDİ (Sadece tamamlarken kontrol edilecek)
         }
 
         try {
-            // "start of day" hatasını önlemek için güvenli tarih oluşturma
             const safeDate = isValid(selectedDate) ? startOfDay(selectedDate) : startOfDay(new Date());
             const now = new Date();
-            // Saat her zaman 12:00:00.SSS olarak gitsin, böylece UTC kayması günü etkilemez
             safeDate.setHours(12, now.getMinutes(), now.getSeconds(), now.getMilliseconds());
 
             const payload = { 
@@ -262,8 +255,6 @@ export default function Dashboard() {
                  toast.warning("Günlük 50 görev sınırına ulaştınız! 🛑");
                  return;
              }
-             
-             // XP SINIRI KONTROLÜ İPTAL EDİLDİ
         }
 
         const safeDate = isValid(selectedDate) ? startOfDay(selectedDate) : startOfDay(new Date());
@@ -297,7 +288,7 @@ export default function Dashboard() {
             setRefreshTrigger(prev => prev + 1);
             toast.info("Görev silindi.");
         } catch (error) {
-            console.error("Silme hatası:", error);
+            console.error("Delete error:", error);
             toast.error("Silme işlemi başarısız.");
         }
     };
@@ -318,7 +309,7 @@ export default function Dashboard() {
             
             setRefreshTrigger(prev => prev + 1); 
         } catch (error) {
-            console.error("Gün kapatma hatası:", error);
+            console.error("Finish day error:", error);
             toast.error("Gün kapatılırken hata oluştu.");
         }
     };
@@ -337,7 +328,7 @@ export default function Dashboard() {
             toast.success("Görev güncellendi! ✨");
             setRefreshTrigger(p => p + 1); 
         } catch (error) {
-            console.error("Güncelleme hatası:", error);
+            console.error("Update error:", error);
             toast.error("Güncelleme başarısız.");
         }
     };
@@ -351,7 +342,6 @@ export default function Dashboard() {
              const HARD_LIMIT = 200; // Sadece tamamlama işleminde geçerli 200 puanlık tavan
              const questPoints = Number(quest.rewardPoints || 0);
 
-             // TİKLEYEREK MAX 200 SINIRI
              if (currentPoints + questPoints > HARD_LIMIT) {
                  toast.warning("Günlük 200 puan limitini aşamazsınız");
                  return;
@@ -372,7 +362,7 @@ export default function Dashboard() {
                 setRefreshTrigger(p => p + 1);
             }
         } catch (error) {
-            console.error("Toggle hatası:", error);
+            console.error("Toggle error:", error);
             toast.error("İşlem sırasında hata oluştu.");
         }
     };
@@ -383,16 +373,16 @@ export default function Dashboard() {
             toast.info(res.data.message || "İşlem başarılı"); 
             setRefreshTrigger(p => p + 1); 
         } catch (error) {
-            console.error("Pinleme hatası:", error);
+            console.error(error);
             toast.error("Pinleme işlemi başarısız.");
         }
     };
 
-    if (loading) return <div className="min-h-screen flex items-center justify-center text-primary animate-pulse">Yükleniyor...</div>;
+    if (loading) return <div className="min-h-screen flex items-center justify-center text-primary animate-pulse bg-gray-50">Yükleniyor...</div>;
 
     return (
         <Layout>
-            <div className="relative">
+            <div className="relative pb-20">
                 {showConfetti && <Confetti width={windowSize.width} height={windowSize.height} recycle={false} numberOfPieces={200} />}
 
                 <DayEndModal 
@@ -414,50 +404,86 @@ export default function Dashboard() {
                 
                 <UserGuideModal isOpen={showGuideModal} onClose={() => setShowGuideModal(false)} />
 
-                <header className="bg-white shadow-sm sticky top-0 z-10">
+                {/* 🌟 PREMIUM HEADER */}
+                <header className="bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-gray-100 shadow-sm transition-all duration-300">
                     <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
-                        <div>
-                            <img src="/Logo_Fox_BF.png" alt="Logo" className="w-36 h-15 object-contain" />
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                                {isToday ? "Bugün" : format(selectedDate, 'd MMMM', { locale: tr })}
-                            </p>
+                        <div className="flex flex-col">
+                            <img src="/Logo_Fox_BF.png" alt="Logo" className="w-28 h-auto object-contain mb-0.5" />
+                            <div className="flex items-center gap-1.5 pl-1">
+                                <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-green-500 animate-pulse' : 'bg-blue-400'}`}></span>
+                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">
+                                    {isToday ? "BUGÜN" : format(selectedDate, 'd MMMM', { locale: tr })}
+                                </p>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             {isAdmin && (
-                                <Link to="/admin" className="text-xs bg-red-100 text-red-600 px-2 py-1.5 rounded-lg font-bold border border-red-200 hover:bg-red-200 transition flex items-center gap-1">
-                                    <span>🛠️</span> <span className="hidden sm:inline">Admin</span>
+                                <Link to="/admin" className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                                    🛠️
                                 </Link>
                             )}
-                            <span className="text-sm text-gray-600 font-medium">{user?.username}</span>
                             
                             <button 
                                 onClick={() => setShowGuideModal(true)} 
-                                className="group relative flex items-center justify-center w-8 h-8 bg-blue-50 text-blue-500 rounded-full hover:bg-blue-500 hover:text-white transition-all duration-300 shadow-sm hover:shadow-md hover:scale-110 active:scale-95" 
-                                title="Nasıl Oynanır?"
+                                className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-500 rounded-full hover:bg-blue-500 hover:text-white transition-all shadow-sm"
                             >
-                                <HelpCircle size={20} className="stroke-[2.5px]" />
-                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                                <HelpCircle size={18} className="stroke-[2.5px]" />
                             </button>
 
-                            <button onClick={() => setShowFeedback(true)} className="text-gray-400 hover:text-primary transition" title="Geri Bildirim">📣</button>
+                            <button onClick={() => setShowFeedback(true)} className="w-8 h-8 flex items-center justify-center bg-purple-50 text-purple-500 rounded-full hover:bg-purple-500 hover:text-white transition-all shadow-sm">
+                                📣
+                            </button>
+
                             {isToday && (
-                                <button onClick={() => setIsDayEndModalOpen(true)} className="bg-dark text-white text-xs px-3 py-1.5 rounded-full font-bold hover:bg-gray-800 transition shadow-sm flex items-center gap-1"><span>🌙</span> Bitir</button>
+                                <button 
+                                    onClick={() => setIsDayEndModalOpen(true)} 
+                                    className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-full font-bold hover:bg-gray-700 transition shadow-lg flex items-center gap-1.5 ml-1"
+                                >
+                                    <span>🌙</span> Bitir
+                                </button>
                             )}
                         </div>
                     </div>
                 </header>
 
                 <main className="max-w-md mx-auto px-4 py-6 animate-fade-in-up space-y-6">
-                    {isToday && <DailyQuote />}
+                    {/* 📜 GÜNLÜK SÖZ - YENİ TASARIM */}
+                    {isToday && (
+                        <div className="transform hover:scale-[1.01] transition-transform duration-300">
+                            <DailyQuote />
+                        </div>
+                    )}
+
+                    {/* 📊 İSTATİSTİKLER - HUD TARZI */}
                     {isToday ? (
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                                <StatsCard title="Günlük Puan" value={`${dashboardData?.pointsEarnedToday} / ${dashboardData?.dailyTarget || 200}`} icon="🎯" color="border-primary" />
-                                
-                                <div className="flex flex-col gap-1">
-                                    <StatsCard title="Seri (Gün)" value={dashboardData?.currentStreak} icon="🔥" color="border-secondary" />
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* Puan Kartı */}
+                            <div className="bg-gradient-to-br from-white to-blue-50 p-1 rounded-2xl shadow-sm border border-blue-100 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-16 h-16 bg-blue-100 rounded-full -mr-8 -mt-8 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+                                <div className="bg-white rounded-xl p-3 h-full flex flex-col items-center justify-center text-center relative z-10">
+                                    <div className="text-2xl mb-1">🎯</div>
+                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-wide mb-0.5">Günlük Puan</div>
+                                    <div className="text-lg font-black text-blue-600">
+                                        {dashboardData?.pointsEarnedToday} <span className="text-gray-300 text-sm">/ {dashboardData?.dailyTarget || 200}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 h-1.5 rounded-full mt-2 overflow-hidden">
+                                        <div 
+                                            className="bg-blue-500 h-full rounded-full transition-all duration-1000 ease-out"
+                                            style={{ width: `${Math.min((dashboardData?.pointsEarnedToday / (dashboardData?.dailyTarget || 200)) * 100, 100)}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Seri Kartı */}
+                            <div className="bg-gradient-to-br from-white to-orange-50 p-1 rounded-2xl shadow-sm border border-orange-100 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-16 h-16 bg-orange-100 rounded-full -mr-8 -mt-8 opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
+                                <div className="bg-white rounded-xl p-3 h-full flex flex-col items-center justify-center text-center relative z-10">
+                                    <div className="text-2xl mb-1">🔥</div>
+                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-wide mb-0.5">Seri</div>
+                                    <div className="text-lg font-black text-orange-500">{dashboardData?.currentStreak} Gün</div>
                                     {dashboardData?.streakStatusMessage && (
-                                        <div className={`text-[10px] text-center font-bold px-2 py-0.5 rounded-md ${
+                                        <div className={`mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md ${
                                             dashboardData.consecutiveMissedDays > 0 
                                                 ? 'bg-red-50 text-red-500 animate-pulse' 
                                                 : 'bg-green-50 text-green-600'
@@ -469,61 +495,106 @@ export default function Dashboard() {
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center">
-                            <h3 className="text-blue-800 font-bold">📅 Planlama Modu</h3>
-                            <p className="text-xs text-blue-600">Yarını şimdiden planlayarak güne önde başla!</p>
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-6 rounded-2xl text-center shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-indigo-400"></div>
+                            <Calendar size={32} className="mx-auto text-blue-400 mb-2 opacity-80" />
+                            <h3 className="text-blue-900 font-bold text-lg">Geleceği Planlıyorsun</h3>
+                            <p className="text-xs text-blue-600 mt-1 font-medium">Yarına şimdiden hazırlanmak zaferin yarısıdır! 🚀</p>
                         </div>
                     )}
                     
-                    <div className="flex items-center justify-between bg-gray-50 p-1.5 rounded-xl border border-gray-100">
-                        <button onClick={handlePrevDay} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-500 hover:text-primary transition">◀</button>
-                        <div className="flex flex-col items-center cursor-pointer" onClick={handleGoToday}>
-                            <span className={`text-sm font-bold ${isToday ? 'text-primary' : 'text-gray-600'}`}>{isToday ? 'BUGÜN' : format(selectedDate, 'EEEE', { locale: tr })}</span>
-                            <span className="text-xs text-gray-400">{format(selectedDate, 'd MMMM yyyy', { locale: tr })}</span>
+                    {/* 🗓️ TARİH GEZGİNİ - KAPSÜL TASARIM */}
+                    <div className="flex items-center justify-between bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm relative z-10">
+                        <button onClick={handlePrevDay} className="w-10 h-10 flex items-center justify-center bg-gray-50 rounded-xl text-gray-500 hover:text-primary hover:bg-blue-50 transition-all active:scale-95">
+                            <ChevronLeft size={20} strokeWidth={3} />
+                        </button>
+                        
+                        <div className="flex flex-col items-center cursor-pointer group" onClick={handleGoToday}>
+                            <span className={`text-sm font-black tracking-wide transition-colors ${isToday ? 'text-primary' : 'text-gray-600 group-hover:text-primary'}`}>
+                                {isToday ? 'BUGÜN' : format(selectedDate, 'EEEE', { locale: tr }).toUpperCase()}
+                            </span>
+                            <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md mt-0.5 group-hover:bg-gray-200 transition-colors">
+                                {format(selectedDate, 'd MMMM yyyy', { locale: tr })}
+                            </span>
                         </div>
-                        <button onClick={handleNextDay} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-500 hover:text-primary transition">▶</button>
+                        
+                        <button onClick={handleNextDay} className="w-10 h-10 flex items-center justify-center bg-gray-50 rounded-xl text-gray-500 hover:text-primary hover:bg-blue-50 transition-all active:scale-95">
+                            <ChevronRight size={20} strokeWidth={3} />
+                        </button>
                     </div>
 
+                    {/* 📌 SIK KULLANILANLAR - POWER-UPS */}
                     {pinnedTemplates && pinnedTemplates.length > 0 && (
                         <div className="animate-fade-in">
-                            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">📌 Sık Kullanılanlar</h3>
-                            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                            <h3 className="flex items-center gap-1 text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">
+                                <Star size={12} className="text-yellow-400 fill-current" /> Sık Kullanılanlar
+                            </h3>
+                            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x px-1">
                                 {pinnedTemplates.map((template) => (
-                                    <div key={template.id} className="min-w-[140px] bg-white p-3 rounded-2xl border border-gray-100 shadow-sm snap-start hover:shadow-md transition-all group relative overflow-hidden">
-                                        <button 
-                                            className="absolute top-0 right-0 p-1 opacity-60 group-hover:opacity-100 transition-opacity z-10 hover:scale-105 active:scale-95"
-                                            onClick={(e) => { e.stopPropagation(); handleAddFromTemplate(template); }}
-                                        >
-                                            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-md font-bold shadow-sm">+ Ekle</span>
-                                        </button>
+                                    <div key={template.id} 
+                                        onClick={(e) => { e.stopPropagation(); handleAddFromTemplate(template); }}
+                                        className="min-w-[150px] bg-white p-3 rounded-2xl border-2 border-transparent hover:border-blue-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden cursor-pointer snap-start"
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white opacity-50"></div>
+                                        
+                                        {/* Renkli Çizgi */}
+                                        <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: template.colorCode || '#3498db' }}></div>
 
-                                        <button 
-                                            className="absolute top-0 left-0 p-1 opacity-60 group-hover:opacity-100 transition-opacity z-10" 
-                                            onClick={(e) => { e.stopPropagation(); if(confirm("Bu şablonu sık kullanılanlardan kaldırmak istediğine emin misin?")) handlePinQuest(template.id); }} 
-                                        >
-                                            <span className="text-[10px] bg-red-50 text-red-500 border border-red-100 px-1.5 py-0.5 rounded-md font-bold hover:bg-red-100 hover:text-red-600 transition-colors">Kaldır</span>
-                                        </button>
-
-                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-2" style={{backgroundColor: `${template.colorCode || '#3498db'}20`, color: template.colorCode || '#3498db'}}>{template.title.charAt(0).toUpperCase()}</div>
-                                        <h4 className="font-bold text-gray-700 text-sm truncate mb-1">{template.title}</h4>
-                                        <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-full">+{template.rewardPoints} XP</span>
+                                        <div className="relative z-10 pl-3">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm" style={{backgroundColor: `${template.colorCode || '#3498db'}15`, color: template.colorCode || '#3498db'}}>
+                                                    {template.title.charAt(0).toUpperCase()}
+                                                </div>
+                                                <button 
+                                                    className="text-gray-300 hover:text-red-400 transition-colors p-1"
+                                                    onClick={(e) => { e.stopPropagation(); if(confirm("Kaldırılsın mı?")) handlePinQuest(template.id); }} 
+                                                >
+                                                    <span className="text-xs">✕</span>
+                                                </button>
+                                            </div>
+                                            
+                                            <h4 className="font-bold text-gray-700 text-sm truncate mb-1 pr-1">{template.title}</h4>
+                                            
+                                            <div className="flex items-center justify-between mt-2">
+                                                <span className="text-[10px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">+{template.rewardPoints} XP</span>
+                                                <span className="text-[10px] font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                                    EKLE <span className="text-xs">→</span>
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><span>⚡</span> {isToday ? "Bugünün Görevleri" : "Planlanan Görevler"}</h2>
+                    {/* 📝 GÖREV LİSTESİ BAŞLIĞI */}
+                    <div className="flex items-end justify-between border-b border-gray-100 pb-2">
+                        <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
+                            <span className="text-2xl">{isToday ? "⚡" : "📅"}</span> 
+                            {isToday ? "Bugünün Görevleri" : "Planlanan Görevler"}
+                        </h2>
+                        <span className="text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
+                            {dashboardData?.todayQuests?.length || 0} / 50
+                        </span>
+                    </div>
                     
+                    {/* ➕ GÖREV EKLEME FORMU */}
                     <AddQuestForm onAdd={handleAddQuest} />
 
-                    <div className="space-y-2 mt-4">
+                    {/* 📋 LİSTE */}
+                    <div className="space-y-3 mt-4 pb-12">
                         {(!dashboardData?.todayQuests || dashboardData.todayQuests.length === 0) ? (
-                            <div className="text-center py-10 px-6 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300 flex flex-col items-center gap-4">
-                                <img src="/Sad_Fox_BF.png" alt="Waiting Fox" className="w-32 h-32 object-contain opacity-80" />
-                                <div>
-                                    <p className="font-bold text-gray-600">{isToday ? "Henüz bir macera eklemedin!" : "Bu tarih için planlanmış görev yok."}</p>
-                                    <p className="text-sm">Hadi, ilk görevini oluşturarak başla.</p>
+                            <div className="text-center py-12 px-6 bg-white rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center gap-4 relative overflow-hidden group hover:border-blue-200 transition-colors">
+                                <div className="absolute inset-0 bg-gray-50/50 pattern-grid-lg opacity-20 pointer-events-none"></div>
+                                <div className="relative z-10 bg-white p-4 rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform duration-300">
+                                    <img src="/Sad_Fox_BF.png" alt="Waiting Fox" className="w-24 h-24 object-contain opacity-80" />
+                                </div>
+                                <div className="relative z-10">
+                                    <p className="font-black text-gray-700 text-lg mb-1">{isToday ? "Liste Bomboş!" : "Plan Yok"}</p>
+                                    <p className="text-sm text-gray-500 max-w-[200px] mx-auto">
+                                        {isToday ? "Hadi, kahramanlık hikayeni yazmaya başla." : "Bu tarih için henüz bir macera planlamadın."}
+                                    </p>
                                 </div>
                             </div>
                         ) : (
