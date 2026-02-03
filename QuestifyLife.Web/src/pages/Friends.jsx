@@ -27,8 +27,7 @@ const AVATAR_MAP = {
 };
 
 export default function Friends() {
-    // DÜZELTME: useAuth() yerine useContext(AuthContext) kullanıyoruz.
-    // Senin AuthContext yapında useAuth export edilmediği için bu yöntem en güvenlisidir.
+    // AuthContext bağlantısı
     const authContext = useContext(AuthContext);
     const user = authContext?.user;
     
@@ -54,13 +53,20 @@ export default function Friends() {
     const [leaderboard, setLeaderboard] = useState([]);
     const [requests, setRequests] = useState([]);
     
+    // Arkadaş Ekleme State'i
     const [inputToAdd, setInputToAdd] = useState(""); 
-    
+    const [isSending, setIsSending] = useState(false); // İstek gönderiliyor mu?
+
     const [viewProfileId, setViewProfileId] = useState(null);
 
     useEffect(() => {
         if (activeTab === 'leaderboard') fetchLeaderboard();
         if (activeTab === 'requests') fetchRequests();
+        
+        // Tab değişince inputu temizle
+        if (activeTab !== 'add') {
+            setInputToAdd("");
+        }
     }, [activeTab]);
 
     // --- API İSTEKLERİ ---
@@ -89,27 +95,33 @@ export default function Friends() {
         }
     };
 
-    const sendFriendRequest = async (e) => {
+    // Arkadaş Ekleme İsteği (Direkt Gönderim)
+    const handleSendRequest = async (e) => {
         e.preventDefault();
         if (!inputToAdd.trim()) return;
         
+        setIsSending(true);
         try {
+            // Backend SendFriendRequestDto yapısına uygun olarak usernameOrEmail gönderiyoruz
             const payload = { usernameOrEmail: inputToAdd }; 
             const res = await api.post('/Friends/send-request', payload);
             
-            if (res.data.isSuccess) {
-                 toast.success(res.data.message || "İstek gönderildi!");
+            // Controller dönüş formatı: Ok(new { message = result, isSuccess = true })
+            if (res.data && res.data.isSuccess) {
+                 toast.success(res.data.message || "Arkadaşlık isteği başarıyla gönderildi!");
+                 setInputToAdd(""); // Başarılıysa inputu temizle
             } else {
-                 toast.success(res.data.message || "İstek gönderildi!");
+                 toast.info(res.data.message || "İşlem tamamlandı.");
             }
-            
-            setInputToAdd("");
         } catch (err) {
-            const msg = err.response?.data?.message || "İstek gönderilemedi.";
+            console.error("İstek gönderme hatası:", err);
+            // Controller BadRequest(new { message = ex.Message, isSuccess = false }) dönüyor
+            const msg = err.response?.data?.message || "İstek gönderilemedi. Kullanıcı bulunamamış olabilir.";
             toast.error(msg);
+        } finally {
+            setIsSending(false);
         }
     };
-    
 
     const respondToRequest = async (requestId, accept) => {
         try {
@@ -183,7 +195,7 @@ export default function Friends() {
 
                 {/* İÇERİK ALANI */}
                 <div className="px-4">
-                    {loading && (
+                    {loading && activeTab !== 'add' && (
                         <div className="flex justify-center py-10">
                             <div className="w-8 h-8 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
@@ -195,14 +207,9 @@ export default function Friends() {
                                 // "Sen" kontrolü
                                 const isCurrentUser = friend.username.includes("(Sen)");
                                 
-                                // Avatar Belirleme Önceliği:
-                                // 1. LocalStorage'dan (En güncel - sayfa yenilenmeden güncellemeler için)
-                                // 2. Context'ten (Yedek)
-                                // 3. API listesinden (Varsayılan)
                                 let displayAvatarId = friend.avatarId;
                                 
                                 if (isCurrentUser) {
-                                    // Zincirleme kontrol (Optional Chaining ile güvenli erişim)
                                     displayAvatarId = localUser?.avatarId || user?.avatarId || friend.avatarId;
                                 }
 
@@ -272,30 +279,42 @@ export default function Friends() {
                     )}
 
                     {!loading && activeTab === 'add' && (
-                        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 text-center animate-fade-in-up">
-                            <div className="w-24 h-24 bg-rose-50 rounded-full mx-auto flex items-center justify-center mb-4">
-                                <span className="text-5xl">💌</span>
-                            </div>
-                            <h3 className="font-bold text-gray-800 text-lg mb-2">Arkadaşlarını Bul</h3>
-                            <p className="text-xs text-gray-500 mb-6 px-4">Kullanıcı adı veya e-posta adresi girerek maceraya ortak arkadaşlarını ekle.</p>
-                            
-                            <form onSubmit={sendFriendRequest}>
-                                <div className="relative mb-4">
-                                    <input 
-                                            type="text" 
-                                            placeholder="Kullanıcı Adı veya E-posta"
-                                            className="w-full p-4 pl-12 border border-gray-200 rounded-xl focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100 bg-gray-50 transition-all text-sm font-medium"
-                                            value={inputToAdd}
-                                            onChange={(e) => setInputToAdd(e.target.value)}
-                                            required
-                                    />
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                        <div className="animate-fade-in-up">
+                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 text-center mb-6">
+                                <div className="w-24 h-24 bg-rose-50 rounded-full mx-auto flex items-center justify-center mb-4">
+                                    <span className="text-5xl">💌</span>
                                 </div>
-                                <button className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold py-4 rounded-xl hover:shadow-lg hover:shadow-rose-200 transform active:scale-95 transition-all flex items-center justify-center gap-2">
-                                    <span>İstek Gönder</span>
-                                    <span>🚀</span>
-                                </button>
-                            </form>
+                                <h3 className="font-bold text-gray-800 text-lg mb-2">Arkadaş Davet Et</h3>
+                                <p className="text-xs text-gray-500 mb-6 px-4">Tanıdığın arkadaşlarının Kullanıcı Adını veya E-posta adresini girerek doğrudan istek gönder.</p>
+                                
+                                <form onSubmit={handleSendRequest}>
+                                    <div className="relative mb-4">
+                                        <input 
+                                                type="text" 
+                                                placeholder="Kullanıcı Adı veya E-posta"
+                                                className="w-full p-4 pl-12 border border-gray-200 rounded-xl focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100 bg-gray-50 transition-all text-sm font-medium"
+                                                value={inputToAdd}
+                                                onChange={(e) => setInputToAdd(e.target.value)}
+                                                required
+                                        />
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">👤</span>
+                                    </div>
+                                    <button 
+                                        type="submit"
+                                        disabled={isSending}
+                                        className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold py-4 rounded-xl hover:shadow-lg hover:shadow-rose-200 transform active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                    >
+                                        {isSending ? (
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        ) : (
+                                            <>
+                                                <span>İstek Gönder</span>
+                                                <span>🚀</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     )}
 
@@ -313,7 +332,7 @@ export default function Friends() {
                                                     className="w-full h-full object-contain"
                                                     onError={(e) => {
                                                         e.target.onerror = null; 
-                                                        e.target.parentNode.innerText = '👤'; // Resim yüklenemezse ikon göster
+                                                        e.target.parentNode.innerText = '👤'; 
                                                     }}
                                                 />
                                             ) : (

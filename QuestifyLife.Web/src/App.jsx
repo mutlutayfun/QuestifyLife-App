@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import ChatWithHappy from './pages/ChatWithHappy';
 import Friends from "./pages/Friends";
 import History from "./pages/History";
 import Leaderboard from './pages/Leaderboard';
@@ -43,6 +44,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/happy" element={<ChatWithHappy />} />
 
           {/* YENİ: GİZLİLİK VE KOŞULLAR (Herkese Açık) */}
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
