@@ -26,31 +26,21 @@ export default function ChatWithHappy() {
         if (!input.trim()) return;
 
         // --- API KEY YÖNETİMİ ---
-        // 'import.meta.env' kullanımı için vite.config.js dosyasında target: 'es2022' ayarlandı.
-        // Eğer hala sorun yaşarsan, apiKey değişkenine manuel olarak string atayabilirsin.
+        // Yerelde istersen VITE_GEMINI_API_KEY ile direkt Google API'ye bağlanabilirsin.
+        // Üretimde güvenli kullanım için /api/happyai endpointini kullanıyoruz.
         let apiKey = "";
-        
+
         try {
             apiKey = import.meta.env.VITE_GEMINI_API_KEY;
         } catch (err) {
             console.warn("Environment variable okunamadı:", err);
         }
-        
-        // ------------------------
 
-        if (!apiKey) {
-            setMessages(prev => [...prev, { role: 'user', text: input }]);
-            setInput('');
-            
-            setTimeout(() => {
-                console.error("HATA: VITE_GEMINI_API_KEY bulunamadı.");
-                setMessages(prev => [...prev, { 
-                    role: 'model', 
-                    text: "Bağlantı hatası! (API Anahtarı eksik). Lütfen .env dosyasını kontrol et. 🦊🔌" 
-                }]);
-            }, 500);
-            return;
-        }
+        const useDirectGemini = Boolean(apiKey);
+        const apiEndpoint = useDirectGemini
+            ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+            : "/api/happyai";
+        // ------------------------
 
         const userMessage = { role: 'user', text: input };
         setMessages(prev => [...prev, userMessage]);
@@ -65,15 +55,20 @@ export default function ChatWithHappy() {
                 Kısa ve öz cevaplar ver (maksimum 2-3 cümle).
             `;
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const payload = useDirectGemini
+                ? {
                     contents: [{ role: 'user', parts: [{ text: userMessage.text }] }],
                     systemInstruction: { parts: [{ text: systemPrompt }] }
-                })
+                }
+                : {
+                    message: userMessage.text,
+                    systemPrompt
+                };
+
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -91,9 +86,12 @@ export default function ChatWithHappy() {
             }
 
             const data = await response.json();
-            const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Hmm, frekanslar karıştı! 🦊";
+            const replyText = useDirectGemini
+                ? data.candidates?.[0]?.content?.parts?.[0]?.text
+                : data.replyText;
+            const safeReplyText = replyText || "Hmm, frekanslar karıştı! 🦊";
 
-            setMessages(prev => [...prev, { role: 'model', text: replyText }]);
+            setMessages(prev => [...prev, { role: 'model', text: safeReplyText }]);
 
         } catch (error) {
             console.error("Happy Error:", error);
@@ -101,7 +99,9 @@ export default function ChatWithHappy() {
             // toast.error("Happy ile bağlantı kurulamadı.");
             
             let msg = "Üzgünüm, şu an bağlantımda bir sorun var. 🦊💔";
-            if (error.message.includes("400") || error.message.includes("API Key")) msg = "API Anahtarı hatalı veya eksik olabilir. 🦊🔑";
+            if (error.message.includes("400") || error.message.includes("API Key") || error.message.includes("GEMINI_API_KEY")) {
+                msg = "API Anahtarı hatalı veya eksik olabilir. 🦊🔑";
+            }
             
             setMessages(prev => [...prev, { role: 'model', text: msg }]);
         } finally {
