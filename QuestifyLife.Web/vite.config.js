@@ -5,6 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   plugins: [
     react(),
+    
     VitePWA({
       registerType: 'autoUpdate',
       // Önbelleğe alınacak statik dosyalar
@@ -38,5 +39,15 @@ export default defineConfig({
         ]
       }
     })
-  ]
+  ],
+  server: {
+    host: true, // Docker için gerekli
+    port: 5173,
+  },
+  build: {
+    target: 'es2022' // import.meta ve top-level await desteği için hedef yükseltildi
+  },
+  esbuild: {
+    target: 'es2022' // Geliştirme ortamı için esbuild hedefi
+  }
 });
