@@ -24,13 +24,34 @@ export default function ChatWithHappy() {
         e.preventDefault();
         if (!input.trim()) return;
 
+        // --- GÜVENLİ YÖNTEM: ENVIRONMENT VARIABLE ---
+        // Vite projelerinde .env dosyasından okuma "import.meta.env" ile yapılır.
+        // Değişken adının VITE_ ile başlaması ZORUNLUDUR.
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
+        // ----------------------------------------
+
+        if (!apiKey) {
+            setMessages(prev => [...prev, { role: 'user', text: input }]);
+            setInput('');
+            setTimeout(() => {
+                // Production ortamında kullanıcıya teknik detay vermemek daha iyidir,
+                // ama geliştirici (sen) için konsola log atıyoruz.
+                console.error("VITE_GEMINI_API_KEY bulunamadı! Lütfen .env dosyasını veya Vercel ayarlarını kontrol et.");
+                
+                setMessages(prev => [...prev, { 
+                    role: 'model', 
+                    text: "Bağlantı hatası! (API Anahtarı eksik). Yönetici ile iletişime geçin. 🦊🔌" 
+                }]);
+            }, 500);
+            return;
+        }
+
         const userMessage = { role: 'user', text: input };
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setIsLoading(true);
 
         try {
-            // System Prompt: Happy'nin karakterini tanımlıyoruz
             const systemPrompt = `
                 Sen "Happy" adında, QuestifyLife uygulamasının neşeli, bilge ve motive edici tilki maskotusun.
                 Kullanıcı adı: ${user?.username || 'Kullanıcı'}.
@@ -43,12 +64,10 @@ export default function ChatWithHappy() {
                 5. Eğer kullanıcı üzgünse onu neşelendir, başarısız hissederse ona "Burası bir oyun ve her yeni gün yeni bir seviye!" diyerek moral ver.
                 6. QuestifyLife uygulamasının terimlerini kullan (XP, Seviye, Lonca, Arena vb.).
                 
-                Kısa ve öz cevaplar ver.
+                Kısa ve öz cevaplar ver (maksimum 2-3 cümle).
             `;
 
-            // Gemini API Çağrısı
-            const apiKey = ""; // API Key runtime'da environment tarafından sağlanır.
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -66,17 +85,19 @@ export default function ChatWithHappy() {
             });
 
             if (!response.ok) {
-                throw new Error('Happy şu an biraz meşgul, sonra tekrar dene!');
+                const errorData = await response.json();
+                console.error("API Error Details:", errorData);
+                throw new Error(`API Hatası: ${response.status}`);
             }
 
             const data = await response.json();
-            const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Hmm, bunu tam anlayamadım ama seninle gurur duyuyorum! 🦊";
+            const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Hmm, frekanslar karıştı sanırım! 🦊 Tekrar dener misin?";
 
             setMessages(prev => [...prev, { role: 'model', text: replyText }]);
 
         } catch (error) {
             console.error("Happy Error:", error);
-            toast.error("Happy bağlantısında bir sorun oluştu.");
+            toast.error("Happy ile bağlantı kurulamadı.");
             setMessages(prev => [...prev, { role: 'model', text: "Üzgünüm, şu an bağlantımda bir sorun var ama sen harikasın, unutma! 🦊💔" }]);
         } finally {
             setIsLoading(false);
