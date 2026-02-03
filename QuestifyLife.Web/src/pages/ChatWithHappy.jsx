@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useContext } from 'react';
-import { AuthContext } from '../context/AuthContext';
-import Layout from '../components/Layout';
+import { AuthContext } from '../context/AuthContext.jsx';
+import Layout from '../components/Layout.jsx';
 import { toast } from 'react-toastify';
 
 export default function ChatWithHappy() {
@@ -25,9 +25,11 @@ export default function ChatWithHappy() {
         if (!input.trim()) return;
 
         // --- GÜVENLİ YÖNTEM: ENVIRONMENT VARIABLE ---
-        // Vite projelerinde .env dosyasından okuma "import.meta.env" ile yapılır.
-        // Değişken adının VITE_ ile başlaması ZORUNLUDUR.
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
+        // NOT: Preview ortamında 'import.meta' hatası almamak için bu satırı yorum satırına alıyoruz.
+        // Canlıya (Vercel) alırken alttaki satırı açıp, bir altındaki const apiKey = ""; satırını silebilirsin.
+        
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        //const apiKey = ""; // Geliştirme/Preview için buraya manuel key yazabilirsin veya boş bırakabilirsin.
         // ----------------------------------------
 
         if (!apiKey) {
@@ -36,7 +38,7 @@ export default function ChatWithHappy() {
             setTimeout(() => {
                 // Production ortamında kullanıcıya teknik detay vermemek daha iyidir,
                 // ama geliştirici (sen) için konsola log atıyoruz.
-                console.error("VITE_GEMINI_API_KEY bulunamadı! Lütfen .env dosyasını veya Vercel ayarlarını kontrol et.");
+                console.error("API Key bulunamadı! Lütfen kodu düzenleyip geçerli bir anahtar girin.");
                 
                 setMessages(prev => [...prev, { 
                     role: 'model', 

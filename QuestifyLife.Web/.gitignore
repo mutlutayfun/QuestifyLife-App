@@ -434,3 +434,6 @@ build/
 # ASP.NET Core User Secrets & Local Configs
 appsettings.Development.json
 secrets.json
+
+# Environment variables
+.env
