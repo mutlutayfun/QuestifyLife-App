@@ -10,6 +10,7 @@ namespace QuestifyLife.Application.DTOs.Friends
     {
         public Guid FriendId { get; set; }
         public string Username { get; set; } = string.Empty;
+        public string? AvatarId { get; set; } = "avatar_1";
         public int TotalXp { get; set; } // Yarışma için önemli!
 
         // YENİ: Detay vermeden istatistik gösteriyoruz

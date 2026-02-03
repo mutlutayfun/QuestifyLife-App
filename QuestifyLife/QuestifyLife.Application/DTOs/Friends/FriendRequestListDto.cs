@@ -10,6 +10,7 @@ namespace QuestifyLife.Application.DTOs.Friends
     {
         public Guid RequestId { get; set; }
         public string SenderUsername { get; set; } = string.Empty;
+        public string AvatarId { get; set; } = "avatar_1";
         public DateTime SentDate { get; set; }
     }
 }

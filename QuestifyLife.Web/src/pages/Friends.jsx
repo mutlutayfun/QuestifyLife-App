@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext'; 
 import api from '../api/axiosConfig';
 import Layout from '../components/Layout';
 import UserProfileModal from '../components/UserProfileModal';
@@ -26,7 +27,27 @@ const AVATAR_MAP = {
 };
 
 export default function Friends() {
-    const [activeTab, setActiveTab] = useState('leaderboard'); // leaderboard, add, requests
+    // DÜZELTME: useAuth() yerine useContext(AuthContext) kullanıyoruz.
+    // Senin AuthContext yapında useAuth export edilmediği için bu yöntem en güvenlisidir.
+    const authContext = useContext(AuthContext);
+    const user = authContext?.user;
+    
+    // LocalStorage'dan kullanıcıyı manuel ve güvenli olarak çekme
+    const [localUser, setLocalUser] = useState(null);
+
+    useEffect(() => {
+        try {
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                const parsedUser = JSON.parse(storedUser);
+                setLocalUser(parsedUser);
+            }
+        } catch (error) {
+            console.error("Local storage okuma hatası:", error);
+        }
+    }, []);
+
+    const [activeTab, setActiveTab] = useState('leaderboard'); 
     const [loading, setLoading] = useState(false);
     
     // Veriler
@@ -88,6 +109,7 @@ export default function Friends() {
             toast.error(msg);
         }
     };
+    
 
     const respondToRequest = async (requestId, accept) => {
         try {
@@ -112,12 +134,17 @@ export default function Friends() {
         }
     }
 
+    // Avatar seçici yardımcı fonksiyon
+    const getAvatarSrc = (avatarId) => {
+        return AVATAR_MAP[avatarId] || AVATAR_MAP['avatar_1'];
+    };
+
     return (
         <Layout>
             <div className="max-w-md mx-auto pb-24">
                 {/* 🌟 HEADER - Pembe/Gül Temalı */}
                 <div className="relative mb-6">
-                     <div className="h-32 bg-gradient-to-r from-pink-500 to-rose-500 rounded-b-[2.5rem] shadow-lg overflow-hidden relative flex flex-col items-center justify-center text-center">
+                      <div className="h-32 bg-gradient-to-r from-pink-500 to-rose-500 rounded-b-[2.5rem] shadow-lg overflow-hidden relative flex flex-col items-center justify-center text-center">
                         <div className="absolute top-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -translate-x-5 -translate-y-5 blur-xl"></div>
                         <div className="absolute bottom-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full translate-x-10 translate-y-10 blur-xl"></div>
                         
@@ -164,61 +191,77 @@ export default function Friends() {
 
                     {!loading && activeTab === 'leaderboard' && (
                         <div className="space-y-3 animate-fade-in-up">
-                            {leaderboard.map((friend, index) => (
-                                <div 
-                                    key={friend.friendId} 
-                                    onClick={() => setViewProfileId(friend.friendId)} 
-                                    className={`relative group bg-white p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between
-                                        ${friend.username.includes("(Sen)") 
-                                            ? 'border-rose-200 bg-rose-50/30 shadow-sm' 
-                                            : 'border-gray-100 hover:border-rose-100 hover:shadow-md'}`}
-                                >
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        {/* Sıra Numarası */}
-                                        <div className={`w-8 h-8 flex items-center justify-center rounded-full font-black text-sm ${index < 3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
-                                            {index + 1}
+                            {leaderboard.map((friend, index) => {
+                                // "Sen" kontrolü
+                                const isCurrentUser = friend.username.includes("(Sen)");
+                                
+                                // Avatar Belirleme Önceliği:
+                                // 1. LocalStorage'dan (En güncel - sayfa yenilenmeden güncellemeler için)
+                                // 2. Context'ten (Yedek)
+                                // 3. API listesinden (Varsayılan)
+                                let displayAvatarId = friend.avatarId;
+                                
+                                if (isCurrentUser) {
+                                    // Zincirleme kontrol (Optional Chaining ile güvenli erişim)
+                                    displayAvatarId = localUser?.avatarId || user?.avatarId || friend.avatarId;
+                                }
+
+                                return (
+                                    <div 
+                                        key={friend.friendId} 
+                                        onClick={() => setViewProfileId(friend.friendId)} 
+                                        className={`relative group bg-white p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between
+                                            ${isCurrentUser 
+                                                ? 'border-rose-200 bg-rose-50/30 shadow-sm' 
+                                                : 'border-gray-100 hover:border-rose-100 hover:shadow-md'}`}
+                                    >
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            {/* Sıra Numarası */}
+                                            <div className={`w-8 h-8 flex items-center justify-center rounded-full font-black text-sm ${index < 3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                {index + 1}
+                                            </div>
+                                            
+                                            {/* Avatar */}
+                                            <div className="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 p-0.5 flex-shrink-0">
+                                                <img 
+                                                    src={getAvatarSrc(displayAvatarId)} 
+                                                    className="w-full h-full object-contain" 
+                                                    onError={(e) => e.target.src = AVATAR_MAP['avatar_1']} 
+                                                    alt="Avatar"
+                                                />
+                                            </div>
+                                            
+                                            {/* İsim ve Bilgi */}
+                                            <div className="min-w-0">
+                                                <p className={`text-sm font-bold truncate ${isCurrentUser ? 'text-rose-600' : 'text-gray-800'}`}>
+                                                    {friend.username.replace(" (Sen)", "")} {isCurrentUser && <span className="text-[10px] bg-rose-100 px-1.5 py-0.5 rounded text-rose-600 ml-1">Sen</span>}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400 font-medium">Seviye {Math.floor(friend.totalXp / 1000) + 1}</p>
+                                            </div>
                                         </div>
                                         
-                                        {/* Avatar */}
-                                        <div className="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 p-0.5 flex-shrink-0">
-                                            <img 
-                                                src={AVATAR_MAP[friend.avatarId] || AVATAR_MAP['avatar_1']} 
-                                                className="w-full h-full object-contain" 
-                                                onError={(e) => e.target.src = AVATAR_MAP['avatar_1']} 
-                                                alt="Avatar"
-                                            />
-                                        </div>
-                                        
-                                        {/* İsim ve Bilgi */}
-                                        <div className="min-w-0">
-                                            <p className={`text-sm font-bold truncate ${friend.username.includes("(Sen)") ? 'text-rose-600' : 'text-gray-800'}`}>
-                                                {friend.username.replace(" (Sen)", "")} {friend.username.includes("(Sen)") && <span className="text-[10px] bg-rose-100 px-1.5 py-0.5 rounded text-rose-600 ml-1">Sen</span>}
-                                            </p>
-                                            <p className="text-[10px] text-gray-400 font-medium">Seviye {Math.floor(friend.totalXp / 1000) + 1}</p>
+                                        {/* XP ve Sil Butonu */}
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-black text-rose-500 text-sm">{friend.totalXp} XP</span>
+                                            
+                                            {!isCurrentUser && (
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        removeFriend(friend.friendId);
+                                                    }}
+                                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
+                                                    title="Arkadaşlıktan Çıkar"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
-                                    
-                                    {/* XP ve Sil Butonu */}
-                                    <div className="flex items-center gap-3">
-                                        <span className="font-black text-rose-500 text-sm">{friend.totalXp} XP</span>
-                                        
-                                        {!friend.username.includes("(Sen)") && (
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removeFriend(friend.friendId);
-                                                }}
-                                                className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
-                                                title="Arkadaşlıktan Çıkar"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             {leaderboard.length === 0 && (
                                 <div className="text-center py-10 opacity-60">
                                     <img src="/Characters/Sad_Fox_BF.png" className="w-32 h-32 mx-auto opacity-50 mb-2 grayscale" alt="Empty" />
@@ -239,12 +282,12 @@ export default function Friends() {
                             <form onSubmit={sendFriendRequest}>
                                 <div className="relative mb-4">
                                     <input 
-                                        type="text" 
-                                        placeholder="Kullanıcı Adı veya E-posta"
-                                        className="w-full p-4 pl-12 border border-gray-200 rounded-xl focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100 bg-gray-50 transition-all text-sm font-medium"
-                                        value={inputToAdd}
-                                        onChange={(e) => setInputToAdd(e.target.value)}
-                                        required
+                                            type="text" 
+                                            placeholder="Kullanıcı Adı veya E-posta"
+                                            className="w-full p-4 pl-12 border border-gray-200 rounded-xl focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100 bg-gray-50 transition-all text-sm font-medium"
+                                            value={inputToAdd}
+                                            onChange={(e) => setInputToAdd(e.target.value)}
+                                            required
                                     />
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                                 </div>
@@ -261,8 +304,21 @@ export default function Friends() {
                             {requests.map(req => (
                                 <div key={req.requestId} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-xl">
-                                            👤
+                                        {/* İSTEKLERDE AVATAR GÖSTERİMİ */}
+                                        <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center overflow-hidden border border-indigo-100">
+                                            {req.avatarId ? (
+                                                <img 
+                                                    src={getAvatarSrc(req.avatarId)} 
+                                                    alt="Avatar" 
+                                                    className="w-full h-full object-contain"
+                                                    onError={(e) => {
+                                                        e.target.onerror = null; 
+                                                        e.target.parentNode.innerText = '👤'; // Resim yüklenemezse ikon göster
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span className="text-xl">👤</span>
+                                            )}
                                         </div>
                                         <div>
                                             <p className="font-bold text-gray-800 text-sm">{req.senderUsername}</p>

@@ -163,7 +163,8 @@ namespace QuestifyLife.Infrastructure.Services
                 {
                     FriendId = friendUser.Id,
                     Username = friendUser.Username,
-                    TotalXp = friendUser.TotalXp
+                    TotalXp = friendUser.TotalXp,
+                    AvatarId = friendUser.AvatarId
                 });
             }
 
