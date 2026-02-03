@@ -159,22 +159,60 @@ namespace QuestifyLife.Infrastructure.Services
             try
             {
                 var quest = await _questRepository.GetByIdAsync(questId);
-                if (quest == null || quest.UserId != userId) return new OperationResultDto { IsSuccess = false, Message = "Erişim engellendi." };
+                if (quest == null || quest.UserId != userId)
+                    return new OperationResultDto { IsSuccess = false, Message = "Erişim engellendi." };
+
+                // Kullanıcıyı da çekmemiz lazım çünkü puanını güncelleyeceğiz
+                var user = await _userRepository.GetByIdAsync(userId);
+                if (user == null)
+                    return new OperationResultDto { IsSuccess = false, Message = "Kullanıcı bulunamadı." };
 
                 var trNow = DateTime.UtcNow.AddHours(3).Date;
                 var dayStartUtc = trNow.AddHours(-3);
                 var dayEndUtc = trNow.AddDays(1).AddHours(-3).AddTicks(-1);
 
-                var isClosed = await _dailyPerformanceRepository.GetWhere(p => p.UserId == userId && p.Date >= dayStartUtc && p.Date <= dayEndUtc && p.IsDayClosed).AnyAsync();
-                if (isClosed) return new OperationResultDto { IsSuccess = false, Message = "Gün kapandığı için durum değiştiremezsin." };
+                // Gün kapalılık kontrolü
+                var isClosed = await _dailyPerformanceRepository
+                    .GetWhere(p => p.UserId == userId && p.Date >= dayStartUtc && p.Date <= dayEndUtc && p.IsDayClosed)
+                    .AnyAsync();
 
+                if (isClosed)
+                    return new OperationResultDto { IsSuccess = false, Message = "Gün kapandığı için durum değiştiremezsin." };
+
+                // --- PUAN HESAPLAMA MANTIĞI (YENİ EKLENEN KISIM) ---
+
+                // Eğer görev şu an TAMAMLANMAMIŞ ise ve TAMAMLANACAKSA -> Puan Ekle
+                if (!quest.IsCompleted)
+                {
+                    user.TotalXp += quest.RewardPoints;
+                }
+                // Eğer görev şu an TAMAMLANMIŞ ise ve GERİ ALINIYORSA -> Puanı Sil
+                else
+                {
+                    user.TotalXp -= quest.RewardPoints;
+                    if (user.TotalXp < 0) user.TotalXp = 0; // Puan eksiye düşmesin
+                }
+
+                // Görev durumunu değiştir
                 quest.IsCompleted = !quest.IsCompleted;
                 quest.CompletedDate = quest.IsCompleted ? DateTime.UtcNow.AddHours(3) : null;
 
+                // Hem görevi hem kullanıcıyı güncelle
                 _questRepository.Update(quest);
-                await _questRepository.SaveAsync();
+                _userRepository.Update(user); // Kullanıcı puanını kaydetmek için bunu ekledik
 
-                return new OperationResultDto { IsSuccess = true, IsCompleted = quest.IsCompleted, Message = "Güncellendi" };
+                // SaveAsync her iki değişikliği de (User ve Quest) veritabanına yazar
+                await _questRepository.SaveAsync();
+                // Not: _userRepository.SaveAsync() çağırmana gerek yok, context aynı olduğu için tek save yeterli ama garanti olsun istersen çağırabilirsin.
+                // Genelde UnitOfWork kullanılır ama senin yapında repo üzerinden gidiyoruz, _questRepository.SaveAsync() context'i save ediyorsa yeterli. 
+                // Eğer GenericRepository içinde _context.SaveChangesAsync() varsa tüm değişiklikler kaydedilir.
+
+                return new OperationResultDto
+                {
+                    IsSuccess = true,
+                    IsCompleted = quest.IsCompleted,
+                    Message = quest.IsCompleted ? $"Tebrikler! +{quest.RewardPoints} XP Kazandın!" : "Görev geri alındı."
+                };
             }
             catch (Exception ex)
             {
