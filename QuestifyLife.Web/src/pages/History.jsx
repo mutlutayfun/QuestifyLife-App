@@ -16,10 +16,14 @@ export default function History() {
         new Date(d.date).toDateString() === date.toDateString()
     );
 
+    // Extract month and year to separate variables
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+
     // Tarih değiştiğinde veriyi çek
     useEffect(() => {
-        fetchCalendarData(date.getFullYear(), date.getMonth() + 1);
-    }, [date.getMonth()]); // Ay değişince veriyi yenile
+        fetchCalendarData(year, month);
+    }, [month, year]); // Ay veya yıl değişince veriyi yenile
 
     const fetchCalendarData = async (year, month) => {
         setLoading(true);
